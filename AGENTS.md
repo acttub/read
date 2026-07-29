@@ -43,6 +43,14 @@ UI는 Pretendard 서브셋(`build-fonts.py`), **대본 본문만 시스템 한�
 
 `design/input.pen`에 4화면 시안이 있다(파일명은 input이지만 4화면이 다 들어 있다). **캔버스는 시안까지고 구현 기준이 아니다** — pen export를 코드로 쓰지 않는다. 캔버스가 Pretendard를 렌더하지 못해 시안만 Noto Sans KR로 보이지만, `font-main` 변수는 정본대로 Pretendard다.
 
+## 알려진 미해결 (2026-07-29 코드 리뷰에서 나왔고 사유를 달아 보류한 것)
+
+고칠 때 다시 판단하라고 남긴다. **셋 다 기본 사용 경로가 아니거나 재현 경로를 못 찾은 것들이다.**
+
+- **`recognition.stop()` 완료를 확인하지 않고 재시작** (`app/prac.js`) — 일부 브라우저가 `InvalidStateError`를 던질 수 있다. 실제 위험은 맞다고 본다. 제대로 고치려면 `stopCueRecognition()`을 Promise로 바꾸고 호출부(`showMyTurn`·`resumeReading` 등)를 전부 비동기로 돌려야 해서 손이 크다. **큐 단어는 기본 넘김 방식이 아니라**(기본은 침묵 감지) 노출이 적어 미뤘다.
+- **버튼 연속 클릭 레이스** — 핸들러가 전부 동기 실행이고 비동기로 갈라지는 지점은 마이크 획득뿐인데 그건 Promise 재사용으로 막았다. 재현 경로를 못 찾아 보류.
+- **일시정지 직후 발화가 끝나면 다음 줄이 조용히 큐에 남는다는 지적** — `pendingSpeechAdvance` 분기가 이어하기에서 정확히 그 경우를 처리하는 것으로 보여 코드 추적으로는 재현하지 못했다. 실제로 겪으면 재현 스텝을 남겨라.
+
 ## 배포
 
 - GitHub가 정본이고 **`git push origin main`이 곧 배포다.** 로컬에서 `vercel --prod`를 치지 않는다.
