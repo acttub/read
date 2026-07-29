@@ -29,6 +29,8 @@ function initializeCharacterPage(scriptText) {
   const silenceOptions = document.getElementById("silenceOptions");
   const silenceSec = document.getElementById("silenceSec");
   const silenceSecLabel = document.getElementById("silenceSecLabel");
+  const cloudVoiceOptions = document.getElementById("cloudVoiceOptions");
+  const cloudVoiceId = document.getElementById("cloudVoiceId");
   const roleParams = {};
   const roleElements = new Map();
   let selectedRole = roles[0];
@@ -355,6 +357,20 @@ function initializeCharacterPage(scriptText) {
     });
   syncAdvanceModeOptions();
 
+  function syncEngineOptions() {
+    const selectedEngine = document.querySelector(
+      'input[name="engine"]:checked',
+    ).value;
+    cloudVoiceOptions.classList.toggle("hidden", selectedEngine !== "cloud");
+  }
+
+  document
+    .querySelectorAll('input[name="engine"]')
+    .forEach((radio) => {
+      radio.addEventListener("change", syncEngineOptions);
+    });
+  syncEngineOptions();
+
   silenceSec.addEventListener("input", () => {
     updateRangeFill(silenceSec);
     silenceSecLabel.textContent =
@@ -370,12 +386,17 @@ function initializeCharacterPage(scriptText) {
     const selectedMode = document.querySelector(
       'input[name="advanceMode"]:checked',
     ).value;
+    const selectedEngine = document.querySelector(
+      'input[name="engine"]:checked',
+    ).value;
 
     savePracticeSettings({
       myRole: selectedRole,
       roleParams,
       advanceMode: selectedMode,
       silenceSec: Number.parseFloat(silenceSec.value),
+      engine: selectedEngine,
+      voiceId: cloudVoiceId.value,
     });
     window.location.href = "/prac";
   });

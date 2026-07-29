@@ -119,6 +119,42 @@
           </p>
 
           <section class="bg-surface p-5 rounded-xl shadow-card">
+            <h2 class="m-0 text-h3">읽어주는 목소리</h2>
+            <div class="mt-3 space-y-1">
+              <label class="radio-tap-target flex cursor-pointer items-center gap-3 rounded-md px-2">
+                <input type="radio" name="engine" value="device" class="radio-input shrink-0" checked>
+                <span>
+                  <strong class="block text-[15px] font-semibold text-ink">기기 음성</strong>
+                  <span class="block text-[13px] font-medium text-ink-tertiary">이 기기의 한국어 음성으로 읽어요</span>
+                </span>
+              </label>
+
+              <label class="radio-tap-target flex cursor-pointer items-center gap-3 rounded-md px-2">
+                <input type="radio" name="engine" value="cloud" class="radio-input shrink-0">
+                <span>
+                  <strong class="block text-[15px] font-semibold text-ink">자연스러운 음성</strong>
+                  <span class="block text-[13px] font-medium text-ink-tertiary">상대 배역 모두를 한 목소리로 읽어요</span>
+                </span>
+              </label>
+
+              <div id="cloudVoiceOptions" class="ml-8 hidden rounded-md bg-surface-sub px-3 py-3">
+                <p id="cloudVoiceCaption" class="mb-1 mt-0 text-[13px] font-medium text-ink-sub">목소리</p>
+                <select id="cloudVoiceId" class="min-h-11 w-full rounded-md border-0 bg-surface px-3 text-[16px] text-ink" aria-labelledby="cloudVoiceCaption">
+                  <option value="cgSgspJ2msm6clMCkdW9">지수 (여·차분)</option>
+                  <option value="EXAVITQu4vr4xnSDxMaL">서현 (여·또렷)</option>
+                  <option value="bIHbv24MWmeRgasZH58o">도윤 (남·또래)</option>
+                  <option value="cjVigY5qzO86Huf0OWal">우진 (남·낮은)</option>
+                  <option value="iP95p4xoKVk53GoZ742B">태호 (남·편안)</option>
+                  <option value="SAz9YHcvj6GT2YYXdXww" selected>하람 (중성)</option>
+                </select>
+                <p class="mb-0 mt-2 text-[12px] font-medium text-ink-tertiary">
+                  읽어주려면 상대 배역 대사가 음성 서비스로 전달돼요. 대본이 기기 밖으로 나가지 않길 원하면 기기 음성을 쓰세요.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section class="bg-surface p-5 rounded-xl shadow-card">
             <h2 class="m-0 text-h3">내 차례 넘기는 방식</h2>
             <div class="mt-3 space-y-1">
               <!-- 침묵 감지가 기본값이다 — 음량만 보고 음성 인식을 안 쓰므로 목소리가

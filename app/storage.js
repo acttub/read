@@ -4,9 +4,21 @@ const STORAGE_KEYS = {
   roleParams: "read.roleParams",
   advanceMode: "read.advanceMode",
   silenceSec: "read.silenceSec",
+  engine: "read.engine",
+  voiceId: "read.voiceId",
 };
 
 const ADVANCE_MODES = new Set(["tap", "silence", "cue"]);
+const ENGINES = new Set(["device", "cloud"]);
+const VOICE_IDS = new Set([
+  "cgSgspJ2msm6clMCkdW9",
+  "EXAVITQu4vr4xnSDxMaL",
+  "bIHbv24MWmeRgasZH58o",
+  "cjVigY5qzO86Huf0OWal",
+  "iP95p4xoKVk53GoZ742B",
+  "SAz9YHcvj6GT2YYXdXww",
+]);
+const DEFAULT_VOICE_ID = "SAz9YHcvj6GT2YYXdXww";
 
 export function saveScript(script) {
   sessionStorage.setItem(STORAGE_KEYS.script, script);
@@ -21,11 +33,15 @@ export function savePracticeSettings({
   roleParams,
   advanceMode,
   silenceSec,
+  engine,
+  voiceId,
 }) {
   sessionStorage.setItem(STORAGE_KEYS.myRole, myRole);
   sessionStorage.setItem(STORAGE_KEYS.roleParams, JSON.stringify(roleParams));
   sessionStorage.setItem(STORAGE_KEYS.advanceMode, advanceMode);
   sessionStorage.setItem(STORAGE_KEYS.silenceSec, String(silenceSec));
+  sessionStorage.setItem(STORAGE_KEYS.engine, engine);
+  sessionStorage.setItem(STORAGE_KEYS.voiceId, voiceId);
 }
 
 export function readMyRole() {
@@ -58,4 +74,14 @@ export function readSilenceSec() {
   return Number.isFinite(stored) && stored >= 0.3 && stored <= 3.0
     ? stored
     : 1.2;
+}
+
+export function readEngine() {
+  const stored = sessionStorage.getItem(STORAGE_KEYS.engine);
+  return ENGINES.has(stored) ? stored : "device";
+}
+
+export function readVoiceId() {
+  const stored = sessionStorage.getItem(STORAGE_KEYS.voiceId);
+  return VOICE_IDS.has(stored) ? stored : DEFAULT_VOICE_ID;
 }

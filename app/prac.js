@@ -6,10 +6,12 @@ import {
 } from "./voices.js";
 import {
   readAdvanceMode,
+  readEngine,
   readMyRole,
   readRoleParams,
   readScript,
   readSilenceSec,
+  readVoiceId,
 } from "./storage.js";
 
 const myRole = readMyRole();
@@ -24,6 +26,8 @@ function initializePracticePage() {
   const { turns } = parseScript(readScript());
   const roleParams = readRoleParams();
   const advanceMode = readAdvanceMode();
+  let engine = readEngine();
+  const voiceId = readVoiceId();
   const silenceThresholdMs = readSilenceSec() * 1000;
 
   const readingSurface = document.getElementById("readingSurface");
@@ -59,6 +63,8 @@ function initializePracticePage() {
   let currentUtterance = null;
   let speechWasPaused = false;
   let pendingSpeechAdvance = false;
+  const cloudAudioByTurn = new Map();
+  let showedCloudLineFallback = false;
 
   let directionTimer = null;
   let directionDueAt = 0;
@@ -227,7 +233,84 @@ function initializePracticePage() {
     processTurn();
   }
 
+  function isCloudUtterance(utterance = currentUtterance) {
+    return Boolean(utterance && utterance.kind === "cloud");
+  }
+
+  function finishCloudSpeech(audio, turn, errorMessage = "") {
+    if (currentUtterance !== audio || turns[idx] !== turn) return;
+
+    audio.onend = null;
+    audio.onerror = null;
+    stopSpeechWatchdog();
+    if (errorMessage) modeError.textContent = errorMessage;
+    handleSpeechFinished(turn);
+  }
+
+  function playCloudAudio(audio, turn) {
+    const playPromise = audio.play();
+    if (!playPromise || typeof playPromise.catch !== "function") return;
+
+    playPromise.catch(() => {
+      // pause() 직후 play()의 Promise가 AbortError로 거절될 수 있다. 일시정지나
+      // 수동 스킵으로 이미 재생 대상이 바뀐 경우에는 재생 오류로 처리하지 않는다.
+      if (paused || currentUtterance !== audio) return;
+      finishCloudSpeech(
+        audio,
+        turn,
+        "자연스러운 음성을 재생하지 못해 다음 대사로 넘어갑니다.",
+      );
+    });
+  }
+
+  function speakLineCloud(turn, source) {
+    const audio = new Audio(source);
+    audio.kind = "cloud";
+
+    // 기존 워치독과 수동 스킵은 currentUtterance.onend = null로 콜백을 끊는다.
+    // Audio의 실제 이벤트 이름인 onended를 이 계약에 맞추고, 워치독이 발동하면
+    // 다음 줄로 넘어가는 동안 이전 mp3도 실제로 멈추게 한다.
+    Object.defineProperty(audio, "onend", {
+      configurable: true,
+      get() {
+        return audio.onended;
+      },
+      set(handler) {
+        audio.onended = handler;
+        if (handler === null) audio.pause();
+      },
+    });
+
+    currentUtterance = audio;
+    scheduleSpeechWatchdog(turn, computeWatchdogMs(turn.text));
+    audio.onend = () => {
+      finishCloudSpeech(audio, turn);
+    };
+    audio.onerror = () => {
+      finishCloudSpeech(
+        audio,
+        turn,
+        "자연스러운 음성을 재생하지 못해 다음 대사로 넘어갑니다.",
+      );
+    };
+    playCloudAudio(audio, turn);
+  }
+
   function speakLine(turn) {
+    if (engine === "cloud") {
+      const cloudSource = cloudAudioByTurn.get(idx);
+      if (cloudSource) {
+        speakLineCloud(turn, cloudSource);
+        return;
+      }
+
+      if (!showedCloudLineFallback) {
+        showedCloudLineFallback = true;
+        modeError.textContent =
+          "일부 대사는 자연스러운 음성으로 준비되지 못해 기기 음성으로 대신 읽습니다.";
+      }
+    }
+
     if (!supportsSpeechSynthesis()) {
       setStatus("음성 합성 미지원");
       modeError.textContent =
@@ -271,6 +354,67 @@ function initializePracticePage() {
       handleSpeechFinished(turn);
     };
     window.speechSynthesis.speak(utterance);
+  }
+
+  async function prepareCloudAudio() {
+    const cloudTurns = [];
+    turns.forEach((turn, turnIndex) => {
+      if (turn.role !== myRole && !turn.isDirection) {
+        cloudTurns.push({ turnIndex, text: turn.text });
+      }
+    });
+
+    const lineCount = cloudTurns.length;
+    pauseButton.disabled = true;
+    pauseButton.textContent = `목소리 준비 중… (${lineCount}줄)`;
+    setStatus(`목소리 준비 중… (${lineCount}줄)`, "primary");
+
+    try {
+      if (lineCount === 0) return true;
+
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          lines: cloudTurns.map(({ text }) => text),
+          voiceId,
+        }),
+      });
+      if (!response.ok) throw new Error("tts request failed");
+
+      const payload = await response.json();
+      if (!Array.isArray(payload.audio)) {
+        throw new Error("tts response is invalid");
+      }
+
+      payload.audio.forEach((base64Audio, lineIndex) => {
+        const cloudTurn = cloudTurns[lineIndex];
+        if (
+          cloudTurn &&
+          typeof base64Audio === "string" &&
+          base64Audio.length > 0
+        ) {
+          cloudAudioByTurn.set(
+            cloudTurn.turnIndex,
+            `data:audio/mpeg;base64,${base64Audio}`,
+          );
+        }
+      });
+
+      if (cloudAudioByTurn.size === 0) {
+        throw new Error("tts response has no audio");
+      }
+      return true;
+    } catch {
+      engine = "device";
+      cloudAudioByTurn.clear();
+      return false;
+    } finally {
+      pauseButton.disabled = false;
+      pauseButton.textContent = "일시정지";
+    }
   }
 
   function ensureMic() {
@@ -598,7 +742,11 @@ function initializePracticePage() {
     setStatus("일시정지");
     syncControls();
 
-    if (currentUtterance && supportsSpeechSynthesis()) {
+    if (isCloudUtterance()) {
+      currentUtterance.pause();
+      speechWasPaused = true;
+      stopSpeechWatchdog({ preserveRemaining: true });
+    } else if (currentUtterance && supportsSpeechSynthesis()) {
       window.speechSynthesis.pause();
       speechWasPaused = true;
       stopSpeechWatchdog({ preserveRemaining: true });
@@ -630,6 +778,18 @@ function initializePracticePage() {
       pendingSpeechAdvance = false;
       idx += 1;
       processTurn();
+      return;
+    }
+
+    if (isCloudUtterance() && speechWasPaused) {
+      speechWasPaused = false;
+      setStatus("읽어주는 중", "primary");
+      playCloudAudio(currentUtterance, turns[idx]);
+      scheduleSpeechWatchdog(
+        turns[idx],
+        Math.max(1000, speechWatchdogRemainingMs),
+      );
+      syncControls();
       return;
     }
 
@@ -673,9 +833,14 @@ function initializePracticePage() {
     stopAdvanceListeners();
     stopDirectionTimer();
     stopSpeechWatchdog();
+    const endingUtterance = currentUtterance;
     currentUtterance = null;
 
-    if (supportsSpeechSynthesis()) {
+    if (isCloudUtterance(endingUtterance)) {
+      endingUtterance.onend = null;
+      endingUtterance.onerror = null;
+      endingUtterance.pause();
+    } else if (supportsSpeechSynthesis()) {
       window.speechSynthesis.cancel();
     }
 
@@ -721,7 +886,12 @@ function initializePracticePage() {
     stopDirectionTimer();
     stopSpeechWatchdog();
     cleanupMedia();
-    if (supportsSpeechSynthesis()) {
+    if (isCloudUtterance()) {
+      currentUtterance.onend = null;
+      currentUtterance.onerror = null;
+      currentUtterance.pause();
+      currentUtterance = null;
+    } else if (supportsSpeechSynthesis()) {
       window.speechSynthesis.cancel();
     }
   }
@@ -737,7 +907,9 @@ function initializePracticePage() {
       currentUtterance.onend = null;
       currentUtterance.onerror = null;
     }
-    if (supportsSpeechSynthesis()) {
+    if (isCloudUtterance()) {
+      currentUtterance.pause();
+    } else if (supportsSpeechSynthesis()) {
       window.speechSynthesis.cancel();
     }
     currentUtterance = null;
@@ -746,11 +918,27 @@ function initializePracticePage() {
     processTurn();
   }
 
-  pauseButton.addEventListener("click", () => {
+  pauseButton.addEventListener("click", async () => {
     if (ended) return;
 
     if (!started) {
       unlockSpeechSynthesis();
+
+      if (engine === "cloud") {
+        const cloudReady = await prepareCloudAudio();
+        if (!sessionActive || ended) return;
+
+        started = true;
+        paused = false;
+        pauseButton.textContent = "일시정지";
+        processTurn();
+        if (!cloudReady && !ended) {
+          modeError.textContent =
+            "자연스러운 음성을 준비하지 못해 기기 음성으로 시작합니다.";
+        }
+        return;
+      }
+
       started = true;
       paused = false;
       pauseButton.textContent = "일시정지";
