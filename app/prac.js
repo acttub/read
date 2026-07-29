@@ -1,0 +1,778 @@
+import { lastWord, parseScript } from "./parse.js";
+import {
+  resolveVoiceForRole,
+  supportsSpeechSynthesis,
+  unlockSpeechSynthesis,
+} from "./voices.js";
+import {
+  readAdvanceMode,
+  readMyRole,
+  readRoleParams,
+  readScript,
+  readSilenceSec,
+} from "./storage.js";
+
+const myRole = readMyRole();
+
+if (!myRole) {
+  window.location.replace("/char");
+} else {
+  initializePracticePage();
+}
+
+function initializePracticePage() {
+  const { turns } = parseScript(readScript());
+  const roleParams = readRoleParams();
+  const advanceMode = readAdvanceMode();
+  const silenceThresholdMs = readSilenceSec() * 1000;
+
+  const readingSurface = document.getElementById("readingSurface");
+  const currentLineCard = document.getElementById("currentLineCard");
+  const currentRoleName = document.getElementById("currentRoleName");
+  const currentLineText = document.getElementById("currentLineText");
+  const progressText = document.getElementById("progressText");
+  const statusPill = document.getElementById("statusPill");
+  const modeError = document.getElementById("modeError");
+  const completionMessage = document.getElementById("completionMessage");
+  const pauseButton = document.getElementById("pauseButton");
+  const nextButton = document.getElementById("nextButton");
+  const modeHint = document.getElementById("modeHint");
+
+  const RMS_THRESHOLD = 0.02;
+  const SpeechRecognitionCtor =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  // 그 순간 눌러야 할 것이 항상 파란 주 버튼이 되게 한다(시작 전엔 "시작", 내 차례를
+  // 기다릴 땐 "다음"). syncControls()가 이 두 클래스를 오가며 갈아 끼운다.
+  const PRIMARY_BUTTON_CLASS =
+    "h-14 w-full flex-1 rounded-lg bg-primary-strong font-bold text-white active:bg-primary-deep disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-tertiary";
+  const SECONDARY_BUTTON_CLASS =
+    "h-14 w-full flex-1 rounded-lg bg-primary-soft font-semibold text-primary active:bg-primary-soft-hover disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-tertiary";
+
+  let idx = 0;
+  let sessionActive = true;
+  let started = false;
+  let paused = true;
+  let ended = false;
+  let waitingForMyTurn = false;
+
+  let currentUtterance = null;
+  let speechWasPaused = false;
+  let pendingSpeechAdvance = false;
+
+  let directionTimer = null;
+  let directionDueAt = 0;
+  let directionRemainingMs = 700;
+
+  let audioCtx = null;
+  let analyser = null;
+  let micStream = null;
+  let silenceRafId = null;
+  let silenceState = "idle";
+  let hasSpokenOnce = false;
+  let silenceStartTs = 0;
+  let silenceElapsedBeforePause = 0;
+
+  let recognition = null;
+  let cueRestartTimer = null;
+  let cueRestartAllowed = false;
+
+  // 발화가 onend/onerror 둘 다 없이 조용히 죽는 사례가 실제로 재현됐다(28초 동안 멈춤).
+  // 그러면 "다음"이 그때까진 비활성이라 나가기밖에 할 게 없었다 — 그래서 다음도 항상
+  // 누를 수 있게 하고, 이 워치독으로 응답이 없으면 스스로 넘어가게 한다.
+  let speechWatchdogTimer = null;
+  let speechWatchdogDueAt = 0;
+  let speechWatchdogRemainingMs = 0;
+
+  const modeHints = {
+    tap: "화면을 누르면 다음으로",
+    silence: "말이 끝나고 잠깐 조용해지면 다음으로 넘어가요",
+    cue: "마지막 어절이 들리면 다음으로",
+  };
+
+  function setStatus(text, tone = "neutral") {
+    statusPill.textContent = text;
+    statusPill.className =
+      tone === "primary"
+        ? "inline-flex rounded-pill bg-primary-soft px-3 py-1 text-[12px] font-semibold text-primary"
+        : "inline-flex rounded-pill bg-surface px-3 py-1 text-[12px] font-semibold text-ink-sub";
+  }
+
+  function renderCurrentTurn(turn) {
+    progressText.textContent = `${idx + 1} / ${turns.length}`;
+    currentRoleName.textContent =
+      turn.role === myRole && !turn.isDirection
+        ? `${turn.role} · 내 차례`
+        : turn.role;
+    currentLineText.textContent = turn.text;
+
+    const isMyTurn = turn.role === myRole && !turn.isDirection;
+    currentLineCard.classList.toggle("bg-primary-soft", isMyTurn);
+    currentLineCard.classList.toggle("bg-surface", !isMyTurn);
+
+    currentLineText.className = turn.isDirection
+      ? "m-0 font-script text-[16px] font-normal italic leading-[1.6] text-ink-tertiary"
+      : "m-0 font-script text-[22px] font-bold leading-[1.45] text-ink";
+  }
+
+  function renderInitialState() {
+    completionMessage.classList.add("hidden");
+
+    if (turns.length === 0) {
+      showEnd();
+      return;
+    }
+
+    renderCurrentTurn(turns[0]);
+    // "/char"에서 이미 "연습 시작"을 눌렀는데 여기서 또 눌러야 해서(iOS 발화 잠금 때문에
+    // 불가피하다) 화면이 침묵하면 멈춘 것처럼 보인다. 알약과 힌트가 먼저 무엇을 눌러야
+    // 하는지 말한다. 넘김 방식별 힌트("화면을 누르면 다음으로" 등)는 실제로 시작한 뒤에나
+    // 의미가 있으므로 그 전엔 보여주지 않는다.
+    setStatus("누르면 시작해요");
+    modeHint.textContent = "시작을 누르면 읽어드릴게요";
+    syncControls();
+  }
+
+  // 버튼 활성/비활성과 "지금 눌러야 할 파란 버튼이 어느 쪽인가"를 한곳에서 정한다.
+  // 상태(started/paused/ended/waitingForMyTurn)가 바뀌는 모든 지점에서 이것 하나만 부른다.
+  function syncControls() {
+    pauseButton.disabled = ended;
+    // "다음"은 내 차례를 기다릴 때만이 아니라, 시작한 뒤라면(상대역이 읽어주는 중이든
+    // 지문 자동 넘김 중이든) 언제나 눌러서 강제로 넘길 수 있다 — 발화가 응답 없이
+    // 멈췄을 때 나가기 말고 쓸 수 있는 탈출구이자, 이미 아는 대사를 건너뛰는 자연스러운
+    // 동작이기도 하다.
+    nextButton.disabled = !started || paused || ended;
+
+    const pauseIsPrimary = !started || paused;
+    pauseButton.className = pauseIsPrimary
+      ? PRIMARY_BUTTON_CLASS
+      : SECONDARY_BUTTON_CLASS;
+
+    const nextIsPrimary = started && !paused && !ended && waitingForMyTurn;
+    nextButton.className = nextIsPrimary
+      ? PRIMARY_BUTTON_CLASS
+      : SECONDARY_BUTTON_CLASS;
+  }
+
+  function stopDirectionTimer({ preserveRemaining = false } = {}) {
+    if (!directionTimer) return;
+    if (preserveRemaining) {
+      directionRemainingMs = Math.max(0, directionDueAt - performance.now());
+    }
+    clearTimeout(directionTimer);
+    directionTimer = null;
+  }
+
+  function scheduleDirectionAdvance(turn, delay = 700) {
+    directionRemainingMs = delay;
+    directionDueAt = performance.now() + delay;
+    directionTimer = window.setTimeout(() => {
+      directionTimer = null;
+      directionRemainingMs = 700;
+      if (!sessionActive || paused || turns[idx] !== turn) return;
+      idx += 1;
+      processTurn();
+    }, delay);
+  }
+
+  function computeWatchdogMs(text) {
+    const estimated = 2000 + (text ? text.length : 0) * 180;
+    return Math.min(30000, Math.max(5000, estimated));
+  }
+
+  function stopSpeechWatchdog({ preserveRemaining = false } = {}) {
+    if (!speechWatchdogTimer) return;
+    if (preserveRemaining) {
+      speechWatchdogRemainingMs = Math.max(
+        0,
+        speechWatchdogDueAt - performance.now(),
+      );
+    }
+    clearTimeout(speechWatchdogTimer);
+    speechWatchdogTimer = null;
+  }
+
+  function scheduleSpeechWatchdog(turn, delay) {
+    speechWatchdogRemainingMs = delay;
+    speechWatchdogDueAt = performance.now() + delay;
+    speechWatchdogTimer = window.setTimeout(() => {
+      speechWatchdogTimer = null;
+      if (!sessionActive || paused || turns[idx] !== turn) return;
+      // 여기서 modeError에 안내를 남겨도 바로 이어지는 processTurn()이 다음 줄을
+      // 그리면서 즉시 지운다(그 함수가 매번 modeError를 비운다) — 같은 동기 흐름 안이라
+      // 사용자는 볼 틈이 없다. 억지로 지연시켜 보여주면 그사이 일시정지가 끼어드는
+      // 경합만 늘어나므로, 메시지 없이 조용히 넘긴다.
+      if (currentUtterance) {
+        currentUtterance.onend = null;
+        currentUtterance.onerror = null;
+      }
+      if (supportsSpeechSynthesis()) window.speechSynthesis.cancel();
+      handleSpeechFinished(turn);
+    }, delay);
+  }
+
+  function handleSpeechFinished(turn) {
+    currentUtterance = null;
+    speechWasPaused = false;
+    if (!sessionActive || turns[idx] !== turn) return;
+
+    if (paused) {
+      pendingSpeechAdvance = true;
+      return;
+    }
+
+    idx += 1;
+    processTurn();
+  }
+
+  function speakLine(turn) {
+    if (!supportsSpeechSynthesis()) {
+      setStatus("음성 합성 미지원");
+      modeError.textContent =
+        "이 브라우저에서 음성 합성을 지원하지 않습니다.";
+      return;
+    }
+
+    const params = roleParams[turn.role] || {
+      voiceName: null,
+      rate: 1,
+      pitch: 1,
+    };
+    const { voice, usedFallback } = resolveVoiceForRole(params);
+
+    if (usedFallback && voice) {
+      modeError.textContent =
+        `설정한 음성을 찾을 수 없어 "${voice.name}"(으)로 대신 읽습니다.`;
+    } else if (!voice) {
+      modeError.textContent =
+        "사용 가능한 한국어 음성이 없어 브라우저 기본 음성으로 읽습니다.";
+    }
+
+    const utterance = new SpeechSynthesisUtterance(turn.text);
+    utterance.lang = "ko-KR";
+    utterance.rate = Number(params.rate) || 1;
+    utterance.pitch = Number.isFinite(Number(params.pitch))
+      ? Number(params.pitch)
+      : 1;
+    if (voice) utterance.voice = voice;
+
+    currentUtterance = utterance;
+    scheduleSpeechWatchdog(turn, computeWatchdogMs(turn.text));
+    utterance.onend = () => {
+      stopSpeechWatchdog();
+      handleSpeechFinished(turn);
+    };
+    utterance.onerror = (event) => {
+      stopSpeechWatchdog();
+      modeError.textContent =
+        `음성 재생 오류: ${event.error || "알 수 없는 오류"}`;
+      handleSpeechFinished(turn);
+    };
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function ensureMic() {
+    if (micStream && analyser) {
+      if (audioCtx && audioCtx.state === "suspended") {
+        return audioCtx.resume().then(() => true).catch((error) => {
+          modeError.textContent =
+            `마이크 재연결 실패: ${error.name}${error.message ? ` — ${error.message}` : ""}`;
+          return false;
+        });
+      }
+      return Promise.resolve(true);
+    }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      modeError.textContent =
+        "이 브라우저에서 마이크 입력(getUserMedia)을 지원하지 않습니다.";
+      return Promise.resolve(false);
+    }
+
+    const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextCtor) {
+      modeError.textContent =
+        "이 브라우저에서 오디오 분석(AudioContext)을 지원하지 않습니다.";
+      return Promise.resolve(false);
+    }
+
+    return navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((stream) => {
+        micStream = stream;
+        audioCtx = new AudioContextCtor();
+        const source = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 2048;
+        source.connect(analyser);
+        return true;
+      })
+      .catch((error) => {
+        modeError.textContent =
+          `마이크 접근 실패: ${error.name}${error.message ? ` — ${error.message}` : ""}`;
+        return false;
+      });
+  }
+
+  function stopSilenceLoop({ preserveState = false } = {}) {
+    if (silenceRafId) {
+      cancelAnimationFrame(silenceRafId);
+      silenceRafId = null;
+    }
+
+    if (
+      preserveState &&
+      silenceState === "silence" &&
+      silenceStartTs > 0
+    ) {
+      silenceElapsedBeforePause = Math.max(
+        0,
+        performance.now() - silenceStartTs,
+      );
+    }
+  }
+
+  function startSilenceMode(turn, { reset = true } = {}) {
+    if (reset) {
+      silenceState = "idle";
+      hasSpokenOnce = false;
+      silenceStartTs = 0;
+      silenceElapsedBeforePause = 0;
+    } else if (silenceState === "silence") {
+      silenceStartTs =
+        performance.now() - silenceElapsedBeforePause;
+    }
+
+    ensureMic().then((ready) => {
+      if (
+        !ready ||
+        !sessionActive ||
+        paused ||
+        !waitingForMyTurn ||
+        advanceMode !== "silence" ||
+        turns[idx] !== turn
+      ) {
+        return;
+      }
+
+      const data = new Uint8Array(analyser.fftSize);
+
+      function tick() {
+        if (
+          !sessionActive ||
+          paused ||
+          !waitingForMyTurn ||
+          advanceMode !== "silence" ||
+          turns[idx] !== turn
+        ) {
+          return;
+        }
+
+        analyser.getByteTimeDomainData(data);
+        let sumSq = 0;
+        for (let index = 0; index < data.length; index += 1) {
+          const value = (data[index] - 128) / 128;
+          sumSq += value * value;
+        }
+        const rms = Math.sqrt(sumSq / data.length);
+
+        if (rms > RMS_THRESHOLD) {
+          hasSpokenOnce = true;
+          silenceState = "speaking";
+          silenceStartTs = 0;
+          silenceElapsedBeforePause = 0;
+        } else if (hasSpokenOnce) {
+          if (silenceState !== "silence") {
+            silenceState = "silence";
+            silenceStartTs =
+              performance.now() - silenceElapsedBeforePause;
+          }
+
+          if (
+            performance.now() - silenceStartTs >=
+            silenceThresholdMs
+          ) {
+            advanceFromMyTurn();
+            return;
+          }
+        }
+
+        silenceRafId = requestAnimationFrame(tick);
+      }
+
+      silenceRafId = requestAnimationFrame(tick);
+    });
+  }
+
+  function stopCueRecognition() {
+    cueRestartAllowed = false;
+    if (cueRestartTimer) {
+      clearTimeout(cueRestartTimer);
+      cueRestartTimer = null;
+    }
+    if (!recognition) return;
+
+    recognition.onresult = null;
+    recognition.onerror = null;
+    recognition.onend = null;
+    try {
+      recognition.stop();
+    } catch {
+      // The recognition instance may already be stopped.
+    }
+    recognition = null;
+  }
+
+  function startCueMode(turn) {
+    if (!SpeechRecognitionCtor) {
+      modeError.textContent =
+        "이 브라우저에서 음성 인식(SpeechRecognition)을 지원하지 않습니다.";
+      return;
+    }
+
+    const target = lastWord(turn.text);
+    if (!target) {
+      modeError.textContent = "마지막 어절을 찾을 수 없습니다.";
+      return;
+    }
+
+    stopCueRecognition();
+    recognition = new SpeechRecognitionCtor();
+    recognition.lang = "ko-KR";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    cueRestartAllowed = true;
+    let finalTranscript = "";
+
+    recognition.onresult = (event) => {
+      let interimTranscript = "";
+      for (
+        let resultIndex = event.resultIndex;
+        resultIndex < event.results.length;
+        resultIndex += 1
+      ) {
+        const transcript = event.results[resultIndex][0].transcript;
+        if (event.results[resultIndex].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+
+      const fullTranscript = finalTranscript + interimTranscript;
+      const normalizedTarget = target.replace(/\s/g, "");
+      if (
+        normalizedTarget &&
+        fullTranscript.replace(/\s/g, "").includes(normalizedTarget)
+      ) {
+        cueRestartAllowed = false;
+        advanceFromMyTurn();
+      }
+    };
+
+    recognition.onerror = (event) => {
+      modeError.textContent = `음성 인식 오류: ${event.error}`;
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        cueRestartAllowed = false;
+      }
+    };
+
+    recognition.onend = () => {
+      if (
+        !cueRestartAllowed ||
+        !sessionActive ||
+        paused ||
+        !waitingForMyTurn ||
+        advanceMode !== "cue" ||
+        turns[idx] !== turn
+      ) {
+        return;
+      }
+
+      cueRestartTimer = window.setTimeout(() => {
+        cueRestartTimer = null;
+        if (!recognition || paused || !waitingForMyTurn) return;
+        try {
+          recognition.start();
+        } catch (error) {
+          modeError.textContent = `인식 다시 시작 실패: ${error.message}`;
+        }
+      }, 150);
+    };
+
+    try {
+      recognition.start();
+    } catch (error) {
+      cueRestartAllowed = false;
+      modeError.textContent = `인식 시작 실패: ${error.message}`;
+    }
+  }
+
+  function stopAdvanceListeners({ preserveSilence = false } = {}) {
+    stopSilenceLoop({ preserveState: preserveSilence });
+    stopCueRecognition();
+  }
+
+  function showMyTurn(turn, { reset = true } = {}) {
+    waitingForMyTurn = true;
+    setStatus("말이 끝나길 기다리는 중");
+    syncControls();
+
+    if (advanceMode === "silence") {
+      startSilenceMode(turn, { reset });
+    } else if (advanceMode === "cue") {
+      startCueMode(turn);
+    }
+  }
+
+  function advanceFromMyTurn() {
+    if (
+      !sessionActive ||
+      paused ||
+      !waitingForMyTurn ||
+      idx >= turns.length
+    ) {
+      return;
+    }
+
+    waitingForMyTurn = false;
+    stopAdvanceListeners();
+    idx += 1;
+    processTurn();
+  }
+
+  function processTurn() {
+    if (!sessionActive || !started || paused || ended) return;
+
+    modeError.textContent = "";
+    waitingForMyTurn = false;
+    syncControls();
+
+    if (idx >= turns.length) {
+      showEnd();
+      return;
+    }
+
+    const turn = turns[idx];
+    renderCurrentTurn(turn);
+
+    if (turn.isDirection) {
+      setStatus("지문");
+      directionRemainingMs = 700;
+      scheduleDirectionAdvance(turn, directionRemainingMs);
+      return;
+    }
+
+    if (turn.role === myRole) {
+      showMyTurn(turn);
+      return;
+    }
+
+    setStatus("읽어주는 중", "primary");
+    speakLine(turn);
+  }
+
+  function pauseReading() {
+    if (!started || paused || ended) return;
+
+    paused = true;
+    pauseButton.textContent = "이어하기";
+    setStatus("일시정지");
+    syncControls();
+
+    if (currentUtterance && supportsSpeechSynthesis()) {
+      window.speechSynthesis.pause();
+      speechWasPaused = true;
+      stopSpeechWatchdog({ preserveRemaining: true });
+    }
+
+    if (directionTimer) {
+      stopDirectionTimer({ preserveRemaining: true });
+    }
+
+    if (waitingForMyTurn) {
+      if (advanceMode === "silence") {
+        stopSilenceLoop({ preserveState: true });
+      } else if (advanceMode === "cue") {
+        stopCueRecognition();
+      }
+    }
+  }
+
+  function resumeReading() {
+    if (!started || !paused || ended) return;
+
+    paused = false;
+    pauseButton.textContent = "일시정지";
+
+    if (pendingSpeechAdvance) {
+      pendingSpeechAdvance = false;
+      idx += 1;
+      processTurn();
+      return;
+    }
+
+    if (currentUtterance && speechWasPaused && supportsSpeechSynthesis()) {
+      speechWasPaused = false;
+      setStatus("읽어주는 중", "primary");
+      window.speechSynthesis.resume();
+      scheduleSpeechWatchdog(
+        turns[idx],
+        Math.max(1000, speechWatchdogRemainingMs),
+      );
+      syncControls();
+      return;
+    }
+
+    const turn = turns[idx];
+    if (!turn) {
+      showEnd();
+      return;
+    }
+
+    if (turn.isDirection && directionRemainingMs >= 0) {
+      setStatus("지문");
+      scheduleDirectionAdvance(turn, directionRemainingMs);
+      syncControls();
+      return;
+    }
+
+    if (waitingForMyTurn) {
+      showMyTurn(turn, { reset: false });
+      return;
+    }
+
+    processTurn();
+  }
+
+  function showEnd() {
+    ended = true;
+    paused = false;
+    waitingForMyTurn = false;
+    stopAdvanceListeners();
+    stopDirectionTimer();
+    stopSpeechWatchdog();
+    currentUtterance = null;
+
+    if (supportsSpeechSynthesis()) {
+      window.speechSynthesis.cancel();
+    }
+
+    progressText.textContent =
+      turns.length > 0 ? `${turns.length} / ${turns.length}` : "0 / 0";
+    currentRoleName.textContent = "";
+    currentLineText.textContent = "대본을 다 읽었어요";
+    currentLineText.className =
+      "m-0 font-script text-[22px] font-bold leading-[1.45] text-ink";
+    currentLineCard.classList.remove("bg-primary-soft");
+    currentLineCard.classList.add("bg-surface");
+    completionMessage.classList.remove("hidden");
+    setStatus("완료");
+    modeError.textContent = "";
+    pauseButton.textContent = "일시정지";
+    syncControls();
+    cleanupMedia();
+  }
+
+  function cleanupMedia() {
+    stopSilenceLoop();
+    stopCueRecognition();
+
+    if (micStream) {
+      micStream.getTracks().forEach((track) => track.stop());
+      micStream = null;
+    }
+    analyser = null;
+
+    if (audioCtx) {
+      audioCtx.close().catch(() => {});
+      audioCtx = null;
+    }
+  }
+
+  function stopSession() {
+    sessionActive = false;
+    waitingForMyTurn = false;
+    stopDirectionTimer();
+    stopSpeechWatchdog();
+    cleanupMedia();
+    if (supportsSpeechSynthesis()) {
+      window.speechSynthesis.cancel();
+    }
+  }
+
+  // 상대역 대사가 재생 중이거나 지문 자동 넘김을 기다리는 중에 "다음"을 눌렀을 때만 온다
+  // (내 차례 대기 중이면 nextButton 클릭 핸들러가 advanceFromMyTurn으로 보낸다).
+  // 응답 없이 멈춘 발화의 탈출구이자, 이미 아는 대사를 건너뛰는 동작이기도 하다.
+  function skipCurrentAutoTurn() {
+    stopSpeechWatchdog();
+    stopDirectionTimer();
+
+    if (currentUtterance) {
+      currentUtterance.onend = null;
+      currentUtterance.onerror = null;
+    }
+    if (supportsSpeechSynthesis()) {
+      window.speechSynthesis.cancel();
+    }
+    currentUtterance = null;
+
+    idx += 1;
+    processTurn();
+  }
+
+  pauseButton.addEventListener("click", () => {
+    if (ended) return;
+
+    if (!started) {
+      unlockSpeechSynthesis();
+      started = true;
+      paused = false;
+      pauseButton.textContent = "일시정지";
+      processTurn();
+      return;
+    }
+
+    if (paused) {
+      resumeReading();
+    } else {
+      pauseReading();
+    }
+  });
+
+  nextButton.addEventListener("click", () => {
+    if (!sessionActive || !started || paused || ended) return;
+    if (waitingForMyTurn) {
+      advanceFromMyTurn();
+      return;
+    }
+    skipCurrentAutoTurn();
+  });
+
+  readingSurface.addEventListener("click", (event) => {
+    if (
+      event.target.closest("button, a, input, select, textarea, label")
+    ) {
+      return;
+    }
+
+    if (
+      started &&
+      sessionActive &&
+      !paused &&
+      advanceMode === "tap" &&
+      waitingForMyTurn
+    ) {
+      advanceFromMyTurn();
+    }
+  });
+
+  document.getElementById("exitButton").addEventListener("click", () => {
+    stopSession();
+    window.location.href = "/input";
+  });
+
+  window.addEventListener("pagehide", stopSession, { once: true });
+
+  renderInitialState();
+}

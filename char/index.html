@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>배역 고르기 · acttub</title>
+    <link rel="stylesheet" href="/styles.css">
+    <style>
+      .radio-tap-target {
+        min-height: 44px;
+      }
+
+      /* device-matrix.py는 input[type=radio] 자체의 크기도 잰다 — 라벨을 44px로 키워도
+         라디오 자체가 작으면(기본 h-5 w-5=20px) 계속 잡힌다. appearance:none으로 44px
+         원을 직접 그리고, 안에 작은 점만 accent-primary 대신 ::before로 칠한다. */
+      .radio-input {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 44px;
+        height: 44px;
+        margin: 0;
+        border-radius: 50%;
+        border: 2px solid var(--color-line);
+        display: grid;
+        place-content: center;
+        cursor: pointer;
+      }
+
+      .radio-input::before {
+        content: "";
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--color-primary);
+        transform: scale(0);
+        transition: transform 0.1s ease;
+      }
+
+      .radio-input:checked {
+        border-color: var(--color-primary);
+      }
+
+      .radio-input:checked::before {
+        transform: scale(1);
+      }
+
+      .range-control {
+        --range-pct: 0%;
+        -webkit-appearance: none;
+        appearance: none;
+        display: block;
+        width: 100%;
+        height: 44px;
+        margin: 0;
+        background: transparent;
+      }
+
+      .range-control::-webkit-slider-runnable-track {
+        height: 4px;
+        border-radius: 2px;
+        background: linear-gradient(
+          to right,
+          var(--color-primary) var(--range-pct),
+          var(--color-line) var(--range-pct)
+        );
+      }
+
+      .range-control::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 28px;
+        height: 28px;
+        margin-top: -12px;
+        border-radius: 50%;
+        background: var(--color-primary);
+        cursor: pointer;
+      }
+
+      .range-control::-moz-range-track {
+        height: 4px;
+        border-radius: 2px;
+        background: var(--color-line);
+      }
+
+      .range-control::-moz-range-progress {
+        height: 4px;
+        border-radius: 2px;
+        background: var(--color-primary);
+      }
+
+      .range-control::-moz-range-thumb {
+        width: 28px;
+        height: 28px;
+        border: 0;
+        border-radius: 50%;
+        background: var(--color-primary);
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body class="m-0 bg-neutral font-sans text-ink">
+    <div class="tier-root bg-neutral">
+      <div class="tier-shell flex min-h-[var(--app-min-h)] flex-col pt-md">
+        <header class="pb-lg">
+          <button id="backButton" type="button" class="mb-3 bg-transparent p-0 text-[14px] font-medium text-ink-tertiary">← 대본 다시 붙여넣기</button>
+          <h1 class="m-0 text-h1">어느 배역이세요?</h1>
+          <p class="mb-0 mt-2 text-body-lg text-ink-sub">
+            고른 배역은 읽지 않고 기다릴게요.<br>
+            나머지 배역을 소리로 읽어드려요.
+          </p>
+        </header>
+
+        <main class="space-y-md">
+          <div id="rolesList" class="space-y-md"></div>
+          <p id="voiceOverlapNote" class="m-0 text-[13px] font-medium text-ink-tertiary" aria-live="polite"></p>
+          <!-- 이 기기에 기기 안에서 도는(localService) 한국어 음성이 하나도 없을 때만 -->
+          <p id="remoteVoiceNotice" class="m-0 hidden text-[13px] font-medium text-ink-tertiary" aria-live="polite">
+            이 기기에는 기기 안에서 도는 한국어 음성이 없어서, 읽어주는 동안 대사가 브라우저 음성 서비스로 전달돼요.
+          </p>
+
+          <section class="bg-surface p-5 rounded-xl shadow-card">
+            <h2 class="m-0 text-h3">내 차례 넘기는 방식</h2>
+            <div class="mt-3 space-y-1">
+              <!-- 침묵 감지가 기본값이다 — 음량만 보고 음성 인식을 안 쓰므로 목소리가
+                   기기 밖으로 안 나간다. 큐 단어는 구조적으로 브라우저 벤더 서버로
+                   목소리를 보내야만 동작해서(막을 방법이 없다) 기본값으로 두지 않는다. -->
+              <label class="radio-tap-target flex cursor-pointer items-center gap-3 rounded-md px-2">
+                <input type="radio" name="advanceMode" value="tap" class="radio-input shrink-0">
+                <span>
+                  <strong class="block text-[15px] font-semibold text-ink">탭</strong>
+                  <span class="block text-[13px] font-medium text-ink-tertiary">화면을 누르면 다음으로</span>
+                </span>
+              </label>
+
+              <label class="radio-tap-target flex cursor-pointer items-center gap-3 rounded-md px-2">
+                <input type="radio" name="advanceMode" value="silence" class="radio-input shrink-0" checked>
+                <span>
+                  <strong class="block text-[15px] font-semibold text-ink">침묵 감지</strong>
+                  <span class="block text-[13px] font-medium text-ink-tertiary">말이 끝난 뒤 조용한 시간을 감지해요</span>
+                </span>
+              </label>
+
+              <div id="silenceOptions" class="ml-8 rounded-md bg-surface-sub px-3 py-2">
+                <!-- <label for>이 아니라 <p>다 — 이 캡션은 range를 감싸지 않아서 44px로 자라지
+                     않는다(device-matrix.py는 label을 전부 탭 타겟으로 본다). 접근성 이름은
+                     aria-labelledby로 연결한다. -->
+                <p id="silenceSecCaption" class="flex items-center justify-between text-[13px] font-medium text-ink-sub">
+                  <span>조용한 시간</span>
+                  <span id="silenceSecLabel" class="font-semibold text-primary">1.2초</span>
+                </p>
+                <input id="silenceSec" class="range-control" type="range" min="0.3" max="3.0" step="0.1" value="1.2" aria-labelledby="silenceSecCaption">
+              </div>
+
+              <label class="radio-tap-target flex cursor-pointer items-center gap-3 rounded-md px-2">
+                <input type="radio" name="advanceMode" value="cue" class="radio-input shrink-0">
+                <span>
+                  <strong class="block text-[15px] font-semibold text-ink">큐 단어</strong>
+                  <span class="block text-[13px] font-medium text-ink-tertiary">내 대사의 마지막 어절이 들리면 다음으로</span>
+                </span>
+              </label>
+
+              <p id="cueNotice" class="ml-8 hidden text-[12px] font-medium text-ink-tertiary" aria-live="polite">
+                이 방식은 내 목소리를 브라우저의 음성 인식 서비스로 보내요.
+              </p>
+            </div>
+          </section>
+        </main>
+
+        <footer class="mt-auto pt-lg">
+          <button id="startButton" type="button" class="h-14 w-full rounded-lg bg-primary-strong font-bold text-white active:bg-primary-deep">연습 시작</button>
+          <p class="mb-0 mt-2 text-center text-[13px] font-medium text-ink-tertiary">2 / 3</p>
+        </footer>
+      </div>
+    </div>
+    <script type="module" src="/app/char.js"></script>
+  </body>
+</html>
