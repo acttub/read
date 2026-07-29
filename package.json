@@ -2,7 +2,8 @@
   "name": "read",
   "version": "0.0.0",
   "private": true,
-  "description": "read.acttub.com — 대본을 넣으면 내 배역 말고 다른 배역 대사를 읽어주는 연습 도구. 스타일만 Tailwind CLI로 굽고 배포는 정적이다.",
+  "type": "module",
+  "description": "read.acttub.com — 대본을 넣으면 내 배역 말고 다른 배역 대사를 읽어주는 연습 도구. 스타일만 Tailwind CLI로 굽고 배포는 정적이다. type:module은 api/의 서버리스 함수가 ESM이라 필요하다 — 없으면 런타임이 .js를 CommonJS로 파싱해 export에서 죽을 수 있다.",
   "scripts": {
     "css": "tailwindcss -i src/input.css -o styles.css --minify",
     "css:watch": "tailwindcss -i src/input.css -o styles.css --watch"
