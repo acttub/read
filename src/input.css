@@ -1,0 +1,34 @@
+/* source(none)으로 자동 탐지를 끄고 실제 페이지만 스캔한다. 이게 없으면 Tailwind가
+   저장소 전체를 훑어 README·AGENTS의 클래스처럼 보이는 문자열까지 CSS로 만들어낸다. */
+@import "tailwindcss" source(none);
+@source "../index.html";
+@source "../input/index.html";
+@source "../char/index.html";
+@source "../prac/index.html";
+@source "../app/*.js";
+
+/* ── brand/ 생성물 ────────────────────────────────────────────────────
+   tools/subproject-sync-brand.py가 넣는다. src/brand/ 안의 파일을 직접 고치지 않는다 —
+   값을 바꾸려면 brand/DESIGN.md를 고치고 다시 생성한 뒤 동기화한다.
+
+   tailwind-starter.css = 색·타이포·radius·spacing 토큰 + 티어 경계(tablet 600 / desktop 1024).
+   responsive-base.css  = 3단 티어 셸(.tier-root/.tier-shell) + 기기 하드닝.
+                          safe-area, 44px 탭 타겟, keep-all, reduced-motion이 여기서 온다. */
+@import "./brand/tailwind-starter.css";
+@import "./brand/responsive-base.css";
+
+/* ── 이 프로젝트에만 있는 것 ──────────────────────────────────────────
+
+   대본 본문 글꼴: 사용자가 넣는 대본은 글자가 임의라 서브셋 폰트로 감당할 수 없다.
+   (다른 서브프로젝트는 문구가 고정이라 build-fonts.py로 쓰인 글자만 굽는다.)
+   그래서 UI는 Pretendard 서브셋, 대본 본문만 시스템 한글 글꼴로 떨어뜨린다.
+   섞이는 게 아니라 "원고는 원고 글꼴"이라는 의도된 구분이다. */
+@theme {
+  --font-script: "Apple SD Gothic Neo", "Noto Sans KR", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* 카드 그림자 — DESIGN.md front-matter에 shadow 키가 없어 생성기가 내보내지 못한다.
+   line-quiz·pick·link-hub도 각자 적고 있다. 생성기가 고쳐지면 지운다. */
+@theme {
+  --shadow-card: 0 1px 3px rgb(0 0 0 / 0.06), 0 4px 16px rgb(0 0 0 / 0.04);
+}

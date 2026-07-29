@@ -1,0 +1,14 @@
+{
+  "name": "read",
+  "version": "0.0.0",
+  "private": true,
+  "description": "read.acttub.com — 대본을 넣으면 내 배역 말고 다른 배역 대사를 읽어주는 연습 도구. 스타일만 Tailwind CLI로 굽고 배포는 정적이다.",
+  "scripts": {
+    "css": "tailwindcss -i src/input.css -o styles.css --minify",
+    "css:watch": "tailwindcss -i src/input.css -o styles.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.11",
+    "tailwindcss": "^4.1.11"
+  }
+}

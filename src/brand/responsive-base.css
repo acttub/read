@@ -1,0 +1,191 @@
+/* acttub 서브프로젝트 공용 반응형 baseline — 3단 티어 + 기기 하드닝.
+   tools/brand-tokens-export.py가 생성한다. 이 파일을 직접 고치지 않는다 —
+   티어 경계를 바꾸려면 brand/DESIGN.md의 `breakpoints:`를 고치고 다시 생성한다.
+
+   ⚠️ 이 파일만으로는 노치·홈바 대응이 켜지지 않는다. HTML에 아래 meta가 있어야
+   env(safe-area-inset-*)가 0이 아닌 값을 준다:
+     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+   `maximum-scale`·`user-scalable=no`를 넣지 않는다 — 안드로이드 크롬은 그걸 지켜서
+   확대가 막힌다(저시력 사용자가 못 읽는다). iOS는 무시하므로 되는 것처럼 보일 뿐이다.
+
+   가로 넘침(overflow-x)을 여기서 숨기지 않는다. `overflow-x: hidden`은 깨진 레이아웃을
+   감추기만 하고 고치지 않는다. 넘침은 tools/device-matrix.py가 기기별로 잡아낸다. */
+
+:root {
+  /* 노치·홈바. viewport-fit=cover가 없으면 전부 0이다(폴백이 동작). */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  /* 주소창이 접혔다 펴져도 콘텐츠가 잘리지 않는 높이.
+     svh(가장 작은 뷰포트)를 쓴다 — dvh는 스크롤 중 값이 변해서 레이아웃이 튄다. */
+  --app-min-h: 100vh;
+
+  /* phone 티어 기본값. 아래 미디어쿼리가 티어별로 덮어쓴다. */
+  --gutter: 20px;
+  --content-max: 100%;
+}
+
+@supports (height: 100svh) {
+  :root { --app-min-h: 100svh; }
+}
+
+/* tablet — 600px 이상. 한 열을 유지하되 폭을 묶어 글줄이 길어지지 않게 한다. */
+@media (min-width: 600px) {
+  :root {
+    --gutter: 24px;
+    --content-max: 560px;
+  }
+}
+
+/* desktop — 1024px 이상. 읽기 폭 상한은 DESIGN.md `## Layout`의 760px이다. */
+@media (min-width: 1024px) {
+  :root {
+    --gutter: 40px;
+    --content-max: 760px;
+  }
+}
+
+/* ── 티어 셸 ──
+   .tier-root  = 화면 전체 폭. 폭을 묶지 않는다.
+   .tier-shell = 그 안의 콘텐츠. 폭 상한 + 좌우 여백을 갖는다.
+   둘로 나눈 이유: 셸에 max-width를 걸면 컨테이너 쿼리가 760px에서 멈춰
+   '지금 데스크톱인가'를 컴포넌트가 알 수 없게 된다. */
+.tier-root {
+  min-height: var(--app-min-h);
+  /* 가로로 눕힌 노치폰에서 콘텐츠가 노치 아래로 들어가지 않게 한다. */
+  padding-top: var(--safe-top);
+}
+
+.tier-shell {
+  width: 100%;
+  max-width: var(--content-max);
+  margin-inline: auto;
+  /* 좌우를 따로 준다. 한쪽 값으로 양쪽을 채우면 가로 회전 시 노치가 있는 쪽만
+     보호되고 반대쪽은 그대로다. 물리 방향으로 쓴다 — safe-area 자체가 물리 방향이다. */
+  padding-left: calc(var(--gutter) + var(--safe-left));
+  padding-right: calc(var(--gutter) + var(--safe-right));
+  padding-bottom: calc(var(--gutter) + var(--safe-bottom));
+}
+
+/* 컨테이너 쿼리를 쓸 때만 붙인다. `@container tier (min-width: …)`의 기준점이 된다.
+   .tier-root에 무조건 걸지 않는 이유: container-type은 containment와 stacking
+   context를 만들어서, 쓰지도 않는 레이아웃 의미가 최상위에 붙는다. */
+.tier-container {
+  container-type: inline-size;
+  container-name: tier;
+}
+
+/* 화면 아래에 고정되는 주요 버튼. 홈바에 가리지 않게 한다.
+   ⚠️ 배경이 필수다. sticky는 제 위치에 닿기 전까지 뷰포트 하단에 **떠 있으므로**,
+   배경이 없으면 아래에 깔린 콘텐츠와 겹쳐 보인다(그림이 깨진 것처럼 읽힌다).
+
+   기본값은 `neutral`(우리 제품의 페이지 바닥색)이다. **흰 배경 페이지에서는
+   회색 띠가 생기므로 `--tier-sticky-bg: var(--color-surface)`를 반드시 준다.**
+   전역에서 페이지 바닥색을 추론할 방법은 없다 — 이건 프로젝트가 지켜야 하는 계약이고,
+   지켰는지는 기기 매트릭스 스크린샷을 사람이 봐서 확인한다. */
+.tier-sticky-bottom {
+  position: sticky;
+  bottom: 0;
+  padding-top: var(--spacing-sm, 8px);
+  padding-bottom: calc(var(--gutter) + var(--safe-bottom));
+  background: var(--tier-sticky-bg, var(--color-neutral, #f2f4f6));
+}
+
+/* ── 티어 전용 표시 ──
+   싼 경우(문구 한 줄, 아이콘 유무)의 탈출구다. 화면 구조가 갈리면 이걸 쓰지 말고
+   컴포넌트 파일을 나눈다(`*.phone.tsx` / `*.desktop.tsx` + brand/responsive-tier.js).
+   이유: CSS로 숨겨도 양쪽 DOM이 다 그려지고 이미지도 다 받는다. 스크린리더는
+   숨긴 쪽도 읽을 수 있고, 폰에서 데스크톱 화면만큼의 데이터를 내려받게 된다. */
+@media (max-width: 599.98px) {
+  [data-tier-only="tablet"], [data-tier-only="desktop"] { display: none !important; }
+}
+@media (min-width: 600px) and (max-width: 1023.98px) {
+  [data-tier-only="phone"], [data-tier-only="desktop"] { display: none !important; }
+}
+@media (min-width: 1024px) {
+  [data-tier-only="phone"], [data-tier-only="tablet"] { display: none !important; }
+}
+
+/* ── 기기 하드닝 ── */
+
+/* Tailwind preflight가 이미 하지만 여기서도 한다 — 이 파일은 Tailwind 없이도
+   동작해야 한다. 빼면 .tier-shell의 width:100%에 좌우 여백이 더해져
+   폰에서 정확히 40px 넘친다(2026-07-26에 참고 구현이 이 버그로 사파리 4종에서 걸렸다). */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* 아이폰 가로 회전 시 글자가 커지는 것을 막는다. */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  /* 한국어 줄바꿈. keep-all만 쓰면 긴 URL이 넘치므로 break-word를 같이 준다. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* 당겨서 새로고침을 막는다. **전역 body에 걸지 않는다** — 그건 사용자가 모든
+   웹페이지에서 기대하는 동작이라 없애면 페이지가 고장난 것처럼 느껴진다.
+   모달·내부 스크롤 영역처럼 정말 가둬야 하는 곳에만 붙인다. */
+.tier-no-overscroll {
+  overscroll-behavior: contain;
+}
+
+/* 입력창 글자가 16px보다 작으면 iOS 사파리가 포커스 때 화면을 확대하고,
+   확대된 채로 남아 레이아웃이 어긋난 것처럼 보인다. 확대를 막는 대신 글자를 키운다. */
+input, textarea, select {
+  font-size: max(16px, 1rem);
+}
+
+/* 탭할 때 안드로이드 크롬이 씌우는 파란 사각형을 없앤다. */
+a, button, [role="button"], input, textarea, select, label {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 손가락이 닿는 최소 크기. 애플 HIG 44px·안드로이드 48dp의 공통 하한이다.
+   높이와 폭을 다 준다 — 높이만 주면 X·아이콘 버튼이 20px 폭으로 남는다.
+   본문 속 인라인 링크는 영향이 없다: 인라인 박스는 min-height/min-width를
+   무시하므로 block·inline-block인 것에만 걸린다.
+
+   `[class~="btn"]`은 공백으로 끊긴 `btn` 클래스만 잡는다. `[class*="btn"]`으로
+   쓰면 `btn-note`·`notbtn`처럼 문자열 안에 btn이 든 것까지 걸려 엉뚱한 요소가 커진다. */
+button, [role="button"], [class~="btn"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* 터치 기기에서 :hover 스타일은 탭한 뒤에도 남아 '눌린 채'로 보인다.
+   Tailwind v4는 `hover:` 변형을 이미 @media (hover: hover)로 감싸므로 손댈 게 없다.
+   순수 CSS로 :hover를 쓸 때만 직접 감싼다 — 여기서 전역으로 되돌리지 않는 이유는
+   컴포넌트가 의도한 배경색까지 예측 불가하게 덮어쓰기 때문이다. */
+
+/* 키보드 사용자에게 초점이 보이게 한다. 마우스 클릭에는 뜨지 않는다. */
+:focus-visible {
+  outline: 2px solid var(--color-primary, #0a79fb);
+  outline-offset: 2px;
+}
+
+/* DESIGN.md `## Motion`: reduced-motion을 존중하되 **기다림 표시는 없애지 않는다.**
+   그래서 전역 차단에서 data-motion="keep"을 처음부터 **제외**한다.
+
+   ⚠️ 여기서 `*`로 다 끄고 나중에 `revert !important`로 되살리는 방법은 동작하지 않는다.
+   `revert`는 앞선 author 규칙으로 돌아가는 게 아니라 author origin을 통째로 걷어내
+   UA 기본값(animation-duration: 0s)이 된다 — 2026-07-26에 크로미움·WebKit 양쪽에서
+   0s로 측정해 확인했다. 되살리는 게 아니라 애초에 매칭하지 않는 것이 맞다. */
+@media (prefers-reduced-motion: reduce) {
+  *:not([data-motion="keep"], [data-motion="keep"] *),
+  *:not([data-motion="keep"], [data-motion="keep"] *)::before,
+  *:not([data-motion="keep"], [data-motion="keep"] *)::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  html {
+    scroll-behavior: auto !important;
+  }
+}

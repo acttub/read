@@ -1,0 +1,109 @@
+/* brand/DESIGN.md 토큰 → Tailwind v4 테마.
+   tools/brand-tokens-export.py가 생성한다. 이 파일을 직접 고치지 않는다 —
+   값을 바꾸려면 DESIGN.md를 고치고 다시 생성한다.
+   라이트 전용이다. 제품 화면에 어두운 배경을 만들지 않는다. */
+@theme {
+  /* 색 — 이름은 DESIGN.md 정본 그대로다. 프로젝트별로 바꿔 쓰지 않는다.
+     `neutral`은 Tailwind 기본 스케일(neutral-50…950)과 단어가 겹치지만 덮어쓰지 않는다 —
+     `bg-neutral`(우리 배경)과 `bg-neutral-100`(Tailwind 기본)이 공존할 뿐이다.
+     link-hub는 이걸 피하려 `ground`로 바꿔 썼는데, 그 개명은 link-hub에만 남은 예외다. */
+  --color-primary: #0a79fb;
+  --color-primary-strong: #0355f1;
+  --color-primary-deep: #0243c4;
+  --color-primary-soft: #e8f3ff;
+  --color-primary-soft-hover: #d8ebff;
+  --color-gradient-start: #44c0fd;
+  --color-gradient-end: #0355f1;
+  --color-neutral: #f2f4f6;
+  --color-surface: #ffffff;
+  --color-surface-sub: #f9fafb;
+  --color-ink: #191f28;
+  --color-ink-sub: #4e5968;
+  --color-ink-tertiary: #6b7684;
+  --color-placeholder: #8b95a1;
+  --color-line: #e5e8eb;
+  --color-success: #03b26c;
+  --color-danger: #f04452;
+  --color-warning: #fe9800;
+  --color-type-01: #ebf4ff;
+  --color-type-02: #d3e7fe;
+  --color-type-03: #bbdafe;
+  --color-type-04: #a4cdfe;
+  --color-type-05: #8cc0fd;
+  --color-type-06: #74b3fd;
+  --color-type-07: #5ca6fc;
+  --color-type-08: #4499fc;
+  --color-type-09: #2c8cfc;
+  --color-type-10: #046eea;
+  --color-type-11: #0362d2;
+  --color-type-12: #0357ba;
+  --color-type-13: #034ca2;
+  --color-type-14: #02418a;
+  --color-type-15: #023672;
+  --color-type-16: #012b5b;
+
+  /* 글자 — 폰트 파일은 각 프로젝트가 따로 실어야 한다.
+     이 블록은 '무슨 글꼴을 쓴다'만 정하지 글꼴을 불러오지 않는다.
+     brand/fonts/의 Pretendard를 @font-face로 걸거나 next/font로 싣는다. */
+  --font-sans: "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", -apple-system, BlinkMacSystemFont, sans-serif;
+  --text-h1: 1.875rem;
+  --text-h1--font-weight: 700;
+  --text-h1--letter-spacing: -0.02em;
+  --text-h1--line-height: 1.33;
+  --text-h2: 1.375rem;
+  --text-h2--font-weight: 700;
+  --text-h2--letter-spacing: -0.02em;
+  --text-h2--line-height: 1.36;
+  --text-h3: 1.25rem;
+  --text-h3--font-weight: 600;
+  --text-h3--line-height: 1.4;
+  --text-subtitle: 1rem;
+  --text-subtitle--font-weight: 600;
+  --text-subtitle--line-height: 1.5;
+  --text-body-lg: 1rem;
+  --text-body-lg--font-weight: 500;
+  --text-body-lg--line-height: 1.6;
+  --text-body-md: 0.9375rem;
+  --text-body-md--font-weight: 500;
+  --text-body-md--line-height: 1.6;
+  --text-body-sm: 0.8125rem;
+  --text-body-sm--font-weight: 500;
+  --text-body-sm--line-height: 1.54;
+  --text-label: 0.75rem;
+  --text-label--font-weight: 600;
+  --text-label--line-height: 1.5;
+  --text-caption: 0.75rem;
+  --text-caption--font-weight: 500;
+  --text-caption--line-height: 1.5;
+
+  /* 모서리 — ⚠️ sm·md·lg·xl은 Tailwind 기본값(4·6·8·12px)을 덮어쓴다.
+     의도한 것이다. 이 값이 이 디자인의 모서리다 —
+     다만 서드파티 컴포넌트(shadcn 등)를 얹으면 그쪽도 같이 둥글어진다. */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-pill: 9999px;
+
+  /* 간격 — Tailwind 기본 `p-4`(1rem 배수) 계열과 `p-md` 계열이 같이 생긴다.
+     우리 표준은 이름 쪽(`p-md`)이다. 숫자 계열은 정본 밖 값이라 쓰지 않는다. */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 40px;
+  --spacing-xxl: 64px;
+
+  /* 그림자 — DESIGN.md `shadow:`가 정본이다.
+     카드와 떠 있는 요소가 프로젝트마다 값을 손으로 복사하지 않게 여기서 내보낸다. */
+  --shadow-card: 0 2px 8px rgba(0,0,0,0.08);
+  --shadow-overlay: 0 8px 24px rgba(0,0,0,0.16);
+
+  /* 화면 티어 — Tailwind 기본 sm·md·lg·xl·2xl을 **지우고** 이 둘만 남긴다.
+     `--breakpoint-*: initial`이 기본 스케일을 없앤다. 이름이 두 벌이면
+     `md:`가 768px인지 우리 tablet인지 매번 헷갈리고, 결국 둘이 섞인다.
+     phone은 변형 없는 기본값이다 — mobile-first라 phone에 접두어를 붙이지 않는다. */
+  --breakpoint-*: initial;
+  --breakpoint-tablet: 600px;
+  --breakpoint-desktop: 1024px;
+}
