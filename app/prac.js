@@ -67,6 +67,8 @@ function initializePracticePage() {
   let audioCtx = null;
   let analyser = null;
   let micStream = null;
+  let micAcquisitionPromise = null;
+  let micRequestActive = false;
   let silenceRafId = null;
   let silenceState = "idle";
   let hasSpokenOnce = false;
@@ -283,6 +285,11 @@ function initializePracticePage() {
       return Promise.resolve(true);
     }
 
+    // 이미 요청이 진행 중이면 새로 하나 더 걸지 않고 그 결과를 같이 기다린다 —
+    // 안 그러면 겹친 호출이 서로 다른 스트림을 받아 micStream을 덮어써 먼저 받은
+    // 스트림의 트랙을 추적 못 하고 흘려버릴 수 있다.
+    if (micAcquisitionPromise) return micAcquisitionPromise;
+
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       modeError.textContent =
         "이 브라우저에서 마이크 입력(getUserMedia)을 지원하지 않습니다.";
@@ -296,9 +303,18 @@ function initializePracticePage() {
       return Promise.resolve(false);
     }
 
-    return navigator.mediaDevices
+    micRequestActive = true;
+    micAcquisitionPromise = navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((stream) => {
+        micAcquisitionPromise = null;
+        // 기다리는 사이 일시정지·나가기 등으로 더 이상 마이크가 필요 없어졌으면
+        // 방금 받은 스트림을 바로 끈다 — 안 그러면 화면은 꺼졌는데 마이크만 켜진 채
+        // 남는다.
+        if (!micRequestActive) {
+          stream.getTracks().forEach((track) => track.stop());
+          return false;
+        }
         micStream = stream;
         audioCtx = new AudioContextCtor();
         const source = audioCtx.createMediaStreamSource(stream);
@@ -308,10 +324,12 @@ function initializePracticePage() {
         return true;
       })
       .catch((error) => {
+        micAcquisitionPromise = null;
         modeError.textContent =
           `마이크 접근 실패: ${error.name}${error.message ? ` — ${error.message}` : ""}`;
         return false;
       });
+    return micAcquisitionPromise;
   }
 
   function stopSilenceLoop({ preserveState = false } = {}) {
@@ -593,6 +611,9 @@ function initializePracticePage() {
     if (waitingForMyTurn) {
       if (advanceMode === "silence") {
         stopSilenceLoop({ preserveState: true });
+        // 분석 루프만 멈추면 마이크 표시등은 계속 켜져 있다 — 일시정지면 트랙 자체를
+        // 끈다. 이어하기에서 ensureMic()이 새로 얻는다(같은 탭이라 권한은 다시 안 묻는다).
+        releaseMic();
       } else if (advanceMode === "cue") {
         stopCueRecognition();
       }
@@ -674,10 +695,8 @@ function initializePracticePage() {
     cleanupMedia();
   }
 
-  function cleanupMedia() {
-    stopSilenceLoop();
-    stopCueRecognition();
-
+  function releaseMic() {
+    micRequestActive = false;
     if (micStream) {
       micStream.getTracks().forEach((track) => track.stop());
       micStream = null;
@@ -688,6 +707,12 @@ function initializePracticePage() {
       audioCtx.close().catch(() => {});
       audioCtx = null;
     }
+  }
+
+  function cleanupMedia() {
+    stopSilenceLoop();
+    stopCueRecognition();
+    releaseMic();
   }
 
   function stopSession() {
@@ -773,6 +798,16 @@ function initializePracticePage() {
   });
 
   window.addEventListener("pagehide", stopSession, { once: true });
+
+  // bfcache로 이 페이지에 뒤로 돌아오면(event.persisted) 스크립트는 다시 안 돌고
+  // DOM만 그대로 복원된다 — pagehide가 이미 sessionActive를 꺼놨으므로 그 상태로
+  // 영구히 멈춰 있게 된다. 가장 안전한 복구는 새로 불러오는 것이다 —
+  // sessionStorage는 bfcache에 영향받지 않으므로 스크립트/배역/설정이 그대로 살아 있다.
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) {
+      window.location.reload();
+    }
+  });
 
   renderInitialState();
 }

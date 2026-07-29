@@ -211,6 +211,14 @@ function initializeCharacterPage(scriptText) {
       koVoices.length < roles.length
         ? `이 기기에서는 한국어 음성이 ${koVoices.length}개라 배역 ${roles.length}개 중 일부는 속도·피치로만 구분됩니다.`
         : "";
+
+    // getKoreanVoices()가 localService를 우선 정렬해 두므로, 있다면 항상 koVoices[0]이
+    // 로컬이다 — 그게 원격이면 이 기기엔 로컬 한국어 음성이 아예 없다는 뜻이다.
+    const hasLocalVoice = koVoices.length > 0 && Boolean(koVoices[0].localService);
+    remoteVoiceNotice.classList.toggle(
+      "hidden",
+      koVoices.length === 0 || hasLocalVoice,
+    );
   }
 
   function repopulateVoiceSelects() {
