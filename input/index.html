@@ -23,6 +23,21 @@
             <!-- <label>이 아니라 <p>다 — device-matrix.py는 label을 전부 탭 타겟으로 보는데
                  이건 캡션이지 체크박스/라디오처럼 44px로 키울 대상이 아니다. 접근성 이름은
                  aria-labelledby로 그대로 연결한다. -->
+            <div class="mb-3 flex flex-wrap items-center gap-3">
+              <input
+                id="scriptFileInput"
+                class="hidden"
+                type="file"
+                accept=".txt,.docx,.hwpx,.hwp,.pdf,text/plain"
+              >
+              <button
+                id="scriptFileButton"
+                type="button"
+                class="inline-flex min-h-11 items-center justify-center rounded-md bg-primary-soft px-3 py-2 text-[14px] font-bold text-primary active:bg-primary-soft-hover disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-tertiary"
+              ><span id="scriptFileButtonText">대본 파일 열기</span></button>
+              <span class="text-[13px] font-medium text-ink-tertiary">txt · docx · hwpx (파일은 이 기기에서만 열려요)</span>
+            </div>
+            <p id="scriptFileStatus" class="mb-2 text-[13px] font-medium text-ink-sub" aria-live="polite" hidden></p>
             <p id="scriptInputLabel" class="mb-2 text-[13px] font-bold text-primary">이렇게 붙여넣으면 돼요</p>
             <textarea
               id="scriptInput"
@@ -30,7 +45,7 @@
               rows="10"
               placeholder="지훈: 왜 아무 말도 안 했어.&#10;서연: 말하면 네가 그만둘 것 같았으니까.&#10;지훈: 그건 네가 정할 일이 아니잖아.&#10;서연: (고개를 돌린다)&#10;서연: 알아. 아는데 그때는 그게 최선이라고 생각했어."
               aria-labelledby="scriptInputLabel"
-              aria-describedby="scriptError"
+              aria-describedby="scriptFileStatus scriptError"
             ></textarea>
             <p id="scriptError" class="mb-0 mt-2 text-[13px] font-medium text-danger" aria-live="polite">대본을 붙여넣어 주세요.</p>
           </section>
