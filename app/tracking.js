@@ -67,6 +67,23 @@ export function trackEvent(name) {
   });
 }
 
+/**
+ * 파생 지표(대본 크기·배역 수·체류 구간)를 보낸다.
+ *
+ * `trackEvent`와 달리 **세션 중복제거를 타지 않는다.** 퍼널 이벤트는 "이 방문에서
+ * 일어났나"가 궁금하지만, 이쪽은 "대본을 몇 개 넣었나 / 몇 번 연습했나"라서
+ * 한 번만 세면 뜻이 달라진다 — 같은 탭에서 작은 대본을 셋 넣으면 3건이어야 한다.
+ */
+export function trackMetric(name) {
+  if (!isProductionHost()) return;
+  sendToSheet({
+    type: "event",
+    app: "read",
+    name,
+    at: new Date().toISOString(),
+  });
+}
+
 export function trackTtsPlay() {
   trackEvent("tts_play");
 }

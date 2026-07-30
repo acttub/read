@@ -13,7 +13,7 @@ import {
   readSilenceSec,
   readVoiceId,
 } from "./storage.js";
-import { trackCore, trackEvent, trackTtsPlay } from "./tracking.js";
+import { trackCore, trackEvent, trackMetric, trackTtsPlay } from "./tracking.js";
 
 const myRole = readMyRole();
 
@@ -32,6 +32,7 @@ function initializePracticePage() {
   const silenceThresholdMs = readSilenceSec() * 1000;
   trackEvent("practice_start");
   const practiceStartedAt = Date.now();
+  let staySent = false;
 
   const readingSurface = document.getElementById("readingSurface");
   const currentLineCard = document.getElementById("currentLineCard");
@@ -900,10 +901,17 @@ function initializePracticePage() {
       window.speechSynthesis.cancel();
     }
 
-    const elapsedMs = Date.now() - practiceStartedAt;
-    if (elapsedMs < 60000) trackEvent("practice_under_1m");
-    else if (elapsedMs <= 300000) trackEvent("practice_1_5m");
-    else trackEvent("practice_over_5m");
+    // 나가기 버튼과 pagehide 가 둘 다 이걸 부른다. 경계를 걸치면 인접한 두 구간이
+    // 모두 찍히므로 한 번만 보낸다.
+    // 이름이 practice_* 가 아니라 stay_* 인 이유: 준비·일시정지·백그라운드가 다 들어간
+    // 화면 체류 시간이지 실제로 소리 내어 연습한 시간이 아니다.
+    if (!staySent && practiceStartedAt) {
+      staySent = true;
+      const elapsedMs = Date.now() - practiceStartedAt;
+      if (elapsedMs < 60000) trackMetric("stay_under_1m");
+      else if (elapsedMs <= 300000) trackMetric("stay_1_5m");
+      else trackMetric("stay_over_5m");
+    }
   }
 
   // 상대역 대사가 재생 중이거나 지문 자동 넘김을 기다리는 중에 "다음"을 눌렀을 때만 온다

@@ -7,7 +7,7 @@ import {
   unlockSpeechSynthesis,
 } from "./voices.js";
 import { readScript, savePracticeSettings } from "./storage.js";
-import { trackEvent } from "./tracking.js";
+import { trackEvent, trackMetric } from "./tracking.js";
 
 const script = readScript();
 
@@ -400,9 +400,9 @@ function initializeCharacterPage(scriptText) {
       voiceId: cloudVoiceId.value,
     });
     trackEvent("char_select");
-    if (roles.length === 1) trackEvent("roles_1");
-    else if (roles.length === 2) trackEvent("roles_2");
-    else if (roles.length >= 3) trackEvent("roles_3plus");
+    if (roles.length === 1) trackMetric("roles_1");
+    else if (roles.length === 2) trackMetric("roles_2");
+    else if (roles.length >= 3) trackMetric("roles_3plus");
     window.location.href = "/prac";
   });
 

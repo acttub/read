@@ -1,7 +1,7 @@
 import { parseScript } from "./parse.js";
 import { readScriptFile, ScriptFileError } from "./scriptfile.js";
 import { saveScript } from "./storage.js";
-import { trackEvent } from "./tracking.js";
+import { trackEvent, trackMetric } from "./tracking.js";
 
 trackEvent("landing_view");
 
@@ -97,16 +97,16 @@ continueButton.addEventListener("click", () => {
 
   const script = scriptInput.value;
   const charCount = script.length;
-  if (charCount < 500) trackEvent("script_len_s");
-  else if (charCount <= 2000) trackEvent("script_len_m");
-  else trackEvent("script_len_l");
+  if (charCount < 500) trackMetric("script_len_s");
+  else if (charCount <= 2000) trackMetric("script_len_m");
+  else trackMetric("script_len_l");
 
   const lineCount = script
     .split("\n")
     .filter((line) => line.trim() !== "").length;
-  if (lineCount < 20) trackEvent("script_lines_s");
-  else if (lineCount <= 60) trackEvent("script_lines_m");
-  else trackEvent("script_lines_l");
+  if (lineCount < 20) trackMetric("script_lines_s");
+  else if (lineCount <= 60) trackMetric("script_lines_m");
+  else trackMetric("script_lines_l");
 
   window.location.href = "/char";
 });
