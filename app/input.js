@@ -94,6 +94,20 @@ continueButton.addEventListener("click", () => {
   if (!validateScript()) return;
   saveScript(scriptInput.value);
   trackEvent("script_submit");
+
+  const script = scriptInput.value;
+  const charCount = script.length;
+  if (charCount < 500) trackEvent("script_len_s");
+  else if (charCount <= 2000) trackEvent("script_len_m");
+  else trackEvent("script_len_l");
+
+  const lineCount = script
+    .split("\n")
+    .filter((line) => line.trim() !== "").length;
+  if (lineCount < 20) trackEvent("script_lines_s");
+  else if (lineCount <= 60) trackEvent("script_lines_m");
+  else trackEvent("script_lines_l");
+
   window.location.href = "/char";
 });
 

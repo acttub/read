@@ -31,6 +31,7 @@ function initializePracticePage() {
   const voiceId = readVoiceId();
   const silenceThresholdMs = readSilenceSec() * 1000;
   trackEvent("practice_start");
+  const practiceStartedAt = Date.now();
 
   const readingSurface = document.getElementById("readingSurface");
   const currentLineCard = document.getElementById("currentLineCard");
@@ -898,6 +899,11 @@ function initializePracticePage() {
     } else if (supportsSpeechSynthesis()) {
       window.speechSynthesis.cancel();
     }
+
+    const elapsedMs = Date.now() - practiceStartedAt;
+    if (elapsedMs < 60000) trackEvent("practice_under_1m");
+    else if (elapsedMs <= 300000) trackEvent("practice_1_5m");
+    else trackEvent("practice_over_5m");
   }
 
   // 상대역 대사가 재생 중이거나 지문 자동 넘김을 기다리는 중에 "다음"을 눌렀을 때만 온다

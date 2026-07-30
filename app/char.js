@@ -400,6 +400,9 @@ function initializeCharacterPage(scriptText) {
       voiceId: cloudVoiceId.value,
     });
     trackEvent("char_select");
+    if (roles.length === 1) trackEvent("roles_1");
+    else if (roles.length === 2) trackEvent("roles_2");
+    else if (roles.length >= 3) trackEvent("roles_3plus");
     window.location.href = "/prac";
   });
 
