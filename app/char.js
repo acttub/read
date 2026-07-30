@@ -7,6 +7,7 @@ import {
   unlockSpeechSynthesis,
 } from "./voices.js";
 import { readScript, savePracticeSettings } from "./storage.js";
+import { trackEvent } from "./tracking.js";
 
 const script = readScript();
 
@@ -398,6 +399,7 @@ function initializeCharacterPage(scriptText) {
       engine: selectedEngine,
       voiceId: cloudVoiceId.value,
     });
+    trackEvent("char_select");
     window.location.href = "/prac";
   });
 

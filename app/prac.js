@@ -13,6 +13,7 @@ import {
   readSilenceSec,
   readVoiceId,
 } from "./storage.js";
+import { trackCore, trackEvent, trackTtsPlay } from "./tracking.js";
 
 const myRole = readMyRole();
 
@@ -29,6 +30,7 @@ function initializePracticePage() {
   let engine = readEngine();
   const voiceId = readVoiceId();
   const silenceThresholdMs = readSilenceSec() * 1000;
+  trackEvent("practice_start");
 
   const readingSurface = document.getElementById("readingSurface");
   const currentLineCard = document.getElementById("currentLineCard");
@@ -249,6 +251,7 @@ function initializePracticePage() {
 
   function playCloudAudio(audio, turn) {
     const playPromise = audio.play();
+    trackTtsPlay();
     if (!playPromise || typeof playPromise.catch !== "function") return;
 
     playPromise.catch(() => {
@@ -354,6 +357,7 @@ function initializePracticePage() {
       handleSpeechFinished(turn);
     };
     window.speechSynthesis.speak(utterance);
+    trackTtsPlay();
   }
 
   async function prepareCloudAudio() {
@@ -984,6 +988,16 @@ function initializePracticePage() {
     stopSession();
     window.location.href = "/input";
   });
+
+  const coreLink = completionMessage.querySelector(
+    'a[href="https://acttub.com"]',
+  );
+  if (coreLink) {
+    coreLink.addEventListener("click", () => {
+      trackCore("read", coreLink.href);
+      trackEvent("cta_click");
+    });
+  }
 
   window.addEventListener("pagehide", stopSession, { once: true });
 

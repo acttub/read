@@ -1,6 +1,9 @@
 import { parseScript } from "./parse.js";
 import { readScriptFile, ScriptFileError } from "./scriptfile.js";
 import { saveScript } from "./storage.js";
+import { trackEvent } from "./tracking.js";
+
+trackEvent("landing_view");
 
 const scriptInput = document.getElementById("scriptInput");
 const continueButton = document.getElementById("continueButton");
@@ -90,6 +93,7 @@ continueButton.addEventListener("click", () => {
   hasInteracted = true;
   if (!validateScript()) return;
   saveScript(scriptInput.value);
+  trackEvent("script_submit");
   window.location.href = "/char";
 });
 
