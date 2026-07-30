@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { afterEach, beforeEach, test } from "node:test";
+import vm from "node:vm";
 
 import { trackCore, trackEvent, trackTtsPlay } from "../app/tracking.js";
 
 const originalGlobals = new Map(
-  ["location", "navigator", "fetch"].map((key) => [
+  ["location", "navigator", "fetch", "sessionStorage"].map((key) => [
     key,
     Object.getOwnPropertyDescriptor(globalThis, key),
   ]),
@@ -18,12 +20,57 @@ function setGlobal(key, value) {
   });
 }
 
+function makeSessionStorage() {
+  const values = new Map();
+  return {
+    getItem(key) {
+      return values.has(key) ? values.get(key) : null;
+    },
+    setItem(key, value) {
+      values.set(key, String(value));
+    },
+  };
+}
+
+async function importTrackingForPage(page) {
+  const url = new URL("../app/tracking.js", import.meta.url);
+  url.searchParams.set("page", `${page}-${Date.now()}-${Math.random()}`);
+  return import(url.href);
+}
+
+async function readGaSnippet(page) {
+  const html = await readFile(new URL(`../${page}/index.html`, import.meta.url), "utf8");
+  const match = html.match(/<!-- GA4[\s\S]*?<script>([\s\S]*?)<\/script>/);
+  assert.ok(match, `${page} GA4 snippet missing`);
+  return match[1];
+}
+
+function runGaSnippet(source, hostname) {
+  const appendedScripts = [];
+  const context = {
+    Date,
+    location: { hostname },
+    document: {
+      createElement: () => ({}),
+      head: {
+        appendChild(script) {
+          appendedScripts.push(script);
+        },
+      },
+    },
+    window: {},
+  };
+  vm.runInNewContext(source, context);
+  return { appendedScripts, window: context.window };
+}
+
 beforeEach(() => {
   setGlobal("location", {
     hostname: "read.acttub.com",
     origin: "https://read.acttub.com",
   });
   setGlobal("fetch", async () => new Response());
+  setGlobal("sessionStorage", makeSessionStorage());
 });
 
 afterEach(() => {
@@ -33,7 +80,7 @@ afterEach(() => {
   }
 });
 
-test("퍼널 이벤트는 발생할 때마다 최소 payload로 보낸다", async () => {
+test("퍼널 이벤트는 같은 세션에서 이름별 첫 한 번만 최소 payload로 보낸다", async () => {
   const sent = [];
   setGlobal("navigator", {
     sendBeacon(url, body) {
@@ -45,7 +92,7 @@ test("퍼널 이벤트는 발생할 때마다 최소 payload로 보낸다", asyn
   trackEvent("landing_view");
   trackEvent("landing_view");
 
-  assert.equal(sent.length, 2);
+  assert.equal(sent.length, 1);
   const payload = JSON.parse(await sent[0].body.text());
   assert.deepEqual(Object.keys(payload).sort(), ["app", "at", "name", "type"]);
   assert.equal(payload.type, "event");
@@ -54,7 +101,28 @@ test("퍼널 이벤트는 발생할 때마다 최소 payload로 보낸다", asyn
   assert.match(payload.at, /^\d{4}-\d{2}-\d{2}T/);
 });
 
-test("tts_play는 두 재생 경로가 함께 써도 모듈에서 첫 한 번만 보낸다", async () => {
+test("페이지 모듈이 바뀌어도 같은 세션의 같은 이벤트는 한 번만 보낸다", async () => {
+  const sent = [];
+  setGlobal("navigator", {
+    sendBeacon(url, body) {
+      sent.push({ url, body });
+      return true;
+    },
+  });
+
+  const inputTracking = await importTrackingForPage("input");
+  inputTracking.trackEvent("page_boundary_event");
+  const charTracking = await importTrackingForPage("char");
+  charTracking.trackEvent("page_boundary_event");
+  const pracTracking = await importTrackingForPage("prac");
+  pracTracking.trackEvent("page_boundary_event");
+
+  assert.equal(sent.length, 1);
+  const payload = JSON.parse(await sent[0].body.text());
+  assert.equal(payload.name, "page_boundary_event");
+});
+
+test("tts_play는 두 재생 경로가 함께 써도 세션에서 첫 한 번만 보낸다", async () => {
   const sent = [];
   setGlobal("navigator", {
     sendBeacon(url, body) {
@@ -87,6 +155,38 @@ test("프로덕션 호스트가 아니면 이벤트를 전송하지 않는다", 
   trackEvent("script_submit");
 
   assert.equal(sent, 0);
+});
+
+test("localhost에서는 세 페이지 모두 gtag 스크립트를 로드하지 않는다", async () => {
+  for (const page of ["input", "char", "prac"]) {
+    const result = runGaSnippet(await readGaSnippet(page), "localhost");
+    assert.equal(result.appendedScripts.length, 0, page);
+    assert.equal(result.window.gtag, undefined, page);
+    assert.equal(result.window.dataLayer, undefined, page);
+  }
+});
+
+test("세 페이지 모두 consent denied를 config보다 먼저 dataLayer에 넣는다", async () => {
+  for (const page of ["input", "char", "prac"]) {
+    const result = runGaSnippet(await readGaSnippet(page), "read.acttub.com");
+    assert.equal(result.appendedScripts.length, 1, page);
+    assert.equal(
+      result.appendedScripts[0].src,
+      "https://www.googletagmanager.com/gtag/js?id=G-DRMEWBN9Y9",
+      page,
+    );
+
+    const commands = result.window.dataLayer.map((entry) => Array.from(entry));
+    const consentIndex = commands.findIndex(
+      ([command, mode]) => command === "consent" && mode === "default",
+    );
+    const configIndex = commands.findIndex(
+      ([command, id]) => command === "config" && id === "G-DRMEWBN9Y9",
+    );
+    assert.ok(consentIndex >= 0, `${page} consent missing`);
+    assert.ok(configIndex > consentIndex, `${page} config must follow consent`);
+    assert.equal(commands[consentIndex][2].analytics_storage, "denied", page);
+  }
 });
 
 test("sendBeacon이 큐에 넣지 못하면 keepalive fetch로 폴백한다", async () => {

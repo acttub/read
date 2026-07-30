@@ -5,6 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>대본 리딩 · acttub</title>
     <link rel="stylesheet" href="/styles.css">
+    <!-- GA4. 프로덕션 호스트에서만 로드한다 — 로컬·프리뷰 유입은 집계하지 않는다. -->
+    <script>
+    (function(){
+      if(!/(^|\.)acttub\.com$/.test(location.hostname))return;
+      var ID='G-DRMEWBN9Y9';
+      var s=document.createElement('script');
+      s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id='+ID;
+      document.head.appendChild(s);
+      window.dataLayer=window.dataLayer||[];
+      window.gtag=function(){window.dataLayer.push(arguments);};
+      window.gtag('js',new Date());
+      window.gtag('consent','default',{analytics_storage:'denied'});
+      window.gtag('config',ID);
+    })();
+    </script>
   </head>
   <body class="m-0 bg-neutral font-sans text-ink">
     <div id="readingSurface" class="tier-root bg-neutral">

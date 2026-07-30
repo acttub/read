@@ -996,6 +996,7 @@ function initializePracticePage() {
     coreLink.addEventListener("click", () => {
       trackCore("read", coreLink.href);
       trackEvent("cta_click");
+      if (window.gtag) window.gtag("event", "acttub_cta", { from: "read" });
     });
   }
 
