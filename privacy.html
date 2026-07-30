@@ -13,9 +13,9 @@
       body { margin: 0; background: var(--color-neutral); color: var(--color-ink); font-family: var(--font-sans); }
       .doc { display: flex; min-height: var(--app-min-h); flex-direction: column; padding-top: 32px; line-height: 1.65; }
       .doc h1 { margin: 0 0 8px; font-size: var(--text-h1); line-height: 1.33; letter-spacing: -0.02em; word-break: keep-all; }
-      .doc .lead { margin: 0 0 28px; color: var(--color-ink-sub); font-size: var(--text-body-md); word-break: keep-all; }
+      .doc .lead { margin: 0 0 28px; color: var(--color-ink-sub); font-size: var(--text-body-lg); word-break: keep-all; }
       .doc h2 { margin: 32px 0 8px; font-size: var(--text-h3); line-height: 1.4; letter-spacing: -0.01em; word-break: keep-all; }
-      .doc p, .doc li { margin: 0 0 12px; color: var(--color-ink-sub); font-size: var(--text-body-md); word-break: keep-all; }
+      .doc p, .doc li { margin: 0 0 12px; color: var(--color-ink-sub); font-size: var(--text-body-lg); word-break: keep-all; }
       .doc ul { margin: 0 0 12px; padding-left: 20px; }
       .doc li { margin: 0 0 6px; }
       .doc b { color: var(--color-ink); }
@@ -24,7 +24,8 @@
       .card p:last-child { margin-bottom: 0; }
       .doc a { color: var(--color-primary); }
       .back { display: inline-flex; min-height: 44px; align-items: center; font-weight: 600; text-decoration: none; }
-      .updated { margin-top: 40px; color: var(--color-ink-tertiary); font-size: var(--text-body-sm); }
+      /* 13px는 다른 화면들이 쓰는 값과 같다 — styles.css에 --text-body-sm이 실려 있지 않아 변수로는 못 쓴다. */
+      .updated { margin-top: 40px; color: var(--color-ink-tertiary); font-size: 13px; }
     </style>
   </head>
   <body>
@@ -42,7 +43,7 @@
         <ul>
           <li>붙여넣거나 파일로 넣은 <b>대본 본문</b> (txt · docx · hwpx — 파일은 이 기기에서 열립니다)</li>
           <li>내 배역, 배역별 목소리, 넘김 방식 같은 <b>설정값</b></li>
-          <li>넘김 방식으로 침묵 감지나 큐 단어를 고른 경우에만 <b>마이크 입력</b></li>
+          <li>넘김 방식이 침묵 감지(기본값)나 큐 단어일 때 쓰는 <b>마이크 입력</b></li>
           <li>어느 화면까지 갔는지 같은 <b>익명 행동 기록</b></li>
         </ul>
         <p>이름·연락처·계정 정보는 받지 않습니다. 로그인도 없습니다.</p>
@@ -62,8 +63,8 @@
         <h2>마이크는 어디까지 쓰나요</h2>
         <p>내 차례가 끝났는지 알아내는 데만 씁니다. <b>녹음을 저장하지 않고</b>, 일시정지하면 마이크를 실제로 끕니다. 넘김 방식 세 개가 각각 다릅니다.</p>
         <ul>
-          <li><b>직접 넘기기 (기본값)</b> — 버튼을 눌러 넘깁니다. <b>마이크를 아예 쓰지 않습니다.</b></li>
-          <li><b>침묵 감지</b> — 음량만 봅니다. <b>소리가 기기 밖으로 나가지 않습니다.</b></li>
+          <li><b>침묵 감지 (기본값)</b> — 말이 끝난 뒤 조용해지는 것을 <b>음량으로만</b> 알아냅니다. 무슨 말을 했는지는 알지 못하고 <b>소리가 기기 밖으로 나가지 않습니다.</b></li>
+          <li><b>탭</b> — 화면을 눌러 직접 넘깁니다. <b>마이크를 아예 쓰지 않습니다.</b></li>
           <li><b>큐 단어</b> — 브라우저의 음성 인식을 쓰기 때문에 <b>말소리가 브라우저 제공사의 서버로 전송됩니다.</b> 이건 구조상 우리가 막을 수 없어서, 고르는 자리에도 같은 내용을 적어 두었습니다.</li>
         </ul>
 
@@ -78,7 +79,8 @@
         <p>넣는 대본의 권리는 저작권자에게 있습니다. 이 도구는 <b>본인이 쓸 수 있는 범위의 대본을 혼자 연습하는 용도</b>입니다. 대본을 공개하거나 남에게 보내는 기능은 없고, 우리가 대본을 모으지도 않습니다.</p>
 
         <h2>아무것도 내보내고 싶지 않다면</h2>
-        <p><b>기기 음성 + 직접 넘기기</b>를 쓰면 대본도 말소리도 기기 밖으로 나가지 않습니다. 둘 다 기본값이라 그대로 두면 됩니다. 단 기기 안에 쓸 수 있는 한국어 음성이 없는 기기는 예외이고, 그럴 때는 화면에서 알려드립니다.</p>
+        <p><b>기기 음성 + 침묵 감지</b>를 쓰면 대본도 말소리도 기기 밖으로 나가지 않습니다. <b>둘 다 기본값이라 그대로 두면 됩니다.</b> 단 기기 안에 쓸 수 있는 한국어 음성이 없는 기기는 예외이고, 그럴 때는 화면에서 알려드립니다.</p>
+        <p>마이크조차 켜고 싶지 않다면 넘김 방식을 <b>탭</b>으로 바꾸세요.</p>
 
         <h2>문의</h2>
         <p>인스타그램 <a href="https://instagram.com/acttub_com" target="_blank" rel="noopener">@acttub_com</a>으로 알려주세요.</p>
