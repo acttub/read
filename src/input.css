@@ -26,9 +26,3 @@
 @theme {
   --font-script: "Apple SD Gothic Neo", "Noto Sans KR", -apple-system, BlinkMacSystemFont, sans-serif;
 }
-
-/* 카드 그림자 — DESIGN.md front-matter에 shadow 키가 없어 생성기가 내보내지 못한다.
-   line-quiz·pick·link-hub도 각자 적고 있다. 생성기가 고쳐지면 지운다. */
-@theme {
-  --shadow-card: 0 1px 3px rgb(0 0 0 / 0.06), 0 4px 16px rgb(0 0 0 / 0.04);
-}
