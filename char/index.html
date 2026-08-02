@@ -61,6 +61,45 @@
         transform: scale(1);
       }
 
+      .include-input {
+        appearance: none;
+        -webkit-appearance: none;
+        box-sizing: border-box;
+        width: calc(var(--spacing-xl) + var(--spacing-sm));
+        height: calc(var(--spacing-xl) + var(--spacing-xs));
+        margin: 0;
+        padding: var(--spacing-xs);
+        border-radius: var(--radius-pill);
+        background: var(--color-line);
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        cursor: pointer;
+      }
+
+      .include-input::before {
+        content: "";
+        width: calc(var(--spacing-xl) - var(--spacing-sm));
+        height: calc(var(--spacing-xl) - var(--spacing-sm));
+        border-radius: var(--radius-pill);
+        background: var(--color-surface);
+      }
+
+      .include-input:checked {
+        justify-content: flex-end;
+        background: var(--color-primary);
+      }
+
+      .include-input:disabled {
+        opacity: 1;
+        cursor: not-allowed;
+      }
+
+      .include-input:focus-visible {
+        outline: auto;
+        outline-offset: var(--spacing-xs);
+      }
+
       .range-control {
         --range-pct: 0%;
         -webkit-appearance: none;
@@ -128,7 +167,17 @@
         </header>
 
         <main class="space-y-md">
-          <div id="rolesList" class="space-y-md"></div>
+          <div id="rolesList" class="space-y-md">
+            <div id="includedRolesList" class="space-y-md"></div>
+            <section id="excludedRolesSection" class="hidden rounded-lg bg-surface-sub">
+              <button id="excludedRolesToggle" type="button" class="flex min-h-11 w-full items-center justify-between gap-md rounded-lg bg-transparent px-md text-left" aria-expanded="false" aria-controls="excludedRolesPanel">
+                <span id="excludedRolesSummary" class="min-w-0 text-[13px] font-medium text-ink-sub"></span>
+                <span id="excludedRolesAction" class="shrink-0 text-[13px] font-semibold text-primary">펼치기</span>
+              </button>
+              <div id="excludedRolesPanel" class="hidden space-y-md px-md pb-md"></div>
+            </section>
+          </div>
+          <p id="roleIncludeError" class="m-0 text-[13px] font-medium text-danger" aria-live="polite"></p>
           <p id="voiceOverlapNote" class="m-0 text-[13px] font-medium text-ink-tertiary" aria-live="polite"></p>
           <!-- 이 기기에 기기 안에서 도는(localService) 한국어 음성이 하나도 없을 때만 -->
           <p id="remoteVoiceNotice" class="m-0 hidden text-[13px] font-medium text-ink-tertiary" aria-live="polite">
@@ -220,7 +269,7 @@
         </main>
 
         <footer class="mt-auto pt-lg">
-          <button id="startButton" type="button" class="h-14 w-full rounded-lg bg-primary-strong font-bold text-white active:bg-primary-deep">연습 시작</button>
+          <button id="startButton" type="button" class="h-14 w-full rounded-lg bg-primary-strong font-bold text-white active:bg-primary-deep disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-tertiary">연습 시작</button>
           <p class="mb-0 mt-2 text-center text-[13px] font-medium text-ink-tertiary">2 / 3</p>
           <p class="mb-0 mt-3 text-center text-[13px] font-medium text-ink-tertiary"><a class="underline" href="/privacy">대본은 어디로 가나요</a></p>
         </footer>

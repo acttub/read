@@ -1,4 +1,5 @@
 import { lastWord, parseScript } from "./parse.js";
+import { filterTurnsByRoleParams } from "./role-inclusion.js";
 import {
   resolveVoiceForRole,
   supportsSpeechSynthesis,
@@ -24,8 +25,10 @@ if (!myRole) {
 }
 
 function initializePracticePage() {
-  const { turns } = parseScript(readScript());
+  const { turns: parsedTurns } = parseScript(readScript());
   const roleParams = readRoleParams();
+  // 옛 세션은 roleParams가 비어 있을 수 있다. 그 경우에는 이전 동작처럼 전부 읽는다.
+  const turns = filterTurnsByRoleParams(parsedTurns, roleParams);
   const advanceMode = readAdvanceMode();
   let engine = readEngine();
   const voiceId = readVoiceId();

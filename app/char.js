@@ -1,5 +1,9 @@
 import { parseScript } from "./parse.js";
 import {
+  getInitialRoleInclusion,
+  partitionRolesByInitialInclusion,
+} from "./role-inclusion.js";
+import {
   getKoreanVoices,
   resolveVoiceForRole,
   ROLE_VOICE_PALETTE,
@@ -32,9 +36,28 @@ function initializeCharacterPage(scriptText) {
   const silenceSecLabel = document.getElementById("silenceSecLabel");
   const cloudVoiceOptions = document.getElementById("cloudVoiceOptions");
   const cloudVoiceId = document.getElementById("cloudVoiceId");
+  const includedRolesList = document.getElementById("includedRolesList");
+  const excludedRolesSection = document.getElementById("excludedRolesSection");
+  const excludedRolesToggle = document.getElementById("excludedRolesToggle");
+  const excludedRolesSummary = document.getElementById("excludedRolesSummary");
+  const excludedRolesAction = document.getElementById("excludedRolesAction");
+  const excludedRolesPanel = document.getElementById("excludedRolesPanel");
+  const roleIncludeError = document.getElementById("roleIncludeError");
+  const startButton = document.getElementById("startButton");
   const roleParams = {};
   const roleElements = new Map();
-  let selectedRole = roles[0];
+  const {
+    lineCounts: roleLineCounts,
+    selectedRole: initialSelectedRole,
+    includedRoles,
+  } = getInitialRoleInclusion(turns, roles);
+  const initialRolePartition = partitionRolesByInitialInclusion(
+    roles,
+    includedRoles,
+  );
+  // 카드 위치는 이 최초 분할로만 정한다. 이후 토글은 상태만 바꾸고 DOM을 옮기지 않는다.
+  const initiallyExcludedRoles = new Set(initialRolePartition.excluded);
+  let selectedRole = initialSelectedRole;
   let koVoices = getKoreanVoices();
 
   roles.forEach((role, index) => {
@@ -46,7 +69,7 @@ function initializeCharacterPage(scriptText) {
     };
 
     const card = document.createElement("article");
-    card.className = "bg-surface p-5 rounded-xl shadow-card";
+    card.className = "rounded-xl";
     card.dataset.role = role;
 
     const headerRow = document.createElement("div");
@@ -62,7 +85,7 @@ function initializeCharacterPage(scriptText) {
     radio.type = "radio";
     radio.name = "myRole";
     radio.value = role;
-    radio.checked = index === 0;
+    radio.checked = role === selectedRole;
     radio.className = "radio-input shrink-0";
 
     const roleCopy = document.createElement("span");
@@ -72,9 +95,7 @@ function initializeCharacterPage(scriptText) {
     roleName.className = "block text-[17px] font-bold text-ink";
     roleName.textContent = role;
 
-    const lineCount = turns.filter(
-      (turn) => turn.role === role && !turn.isDirection,
-    ).length;
+    const lineCount = roleLineCounts.get(role);
     const roleMeta = document.createElement("span");
     roleMeta.className =
       "mt-0.5 block text-[13px] font-medium text-ink-tertiary";
@@ -92,8 +113,26 @@ function initializeCharacterPage(scriptText) {
 
     headerRow.append(rolePicker, previewButton);
 
+    const includeRow = document.createElement("label");
+    includeRow.className =
+      "mt-sm flex min-h-11 cursor-pointer items-center justify-between gap-md";
+
+    const includeText = document.createElement("span");
+    includeText.className = "text-[14px] font-semibold text-ink-sub";
+    includeText.textContent = "읽기에 포함";
+
+    const includeToggle = document.createElement("input");
+    includeToggle.type = "checkbox";
+    includeToggle.className = "include-input shrink-0";
+    includeToggle.checked = includedRoles.has(role);
+    includeToggle.dataset.includeRole = role;
+    includeToggle.setAttribute("role", "switch");
+    includeToggle.setAttribute("aria-label", `${role} 읽기에 포함`);
+
+    includeRow.append(includeText, includeToggle);
+
     const controls = document.createElement("div");
-    controls.className = "mt-4 space-y-3";
+    controls.className = "mt-md space-y-sm";
 
     const voiceLabel = document.createElement("label");
     voiceLabel.className =
@@ -131,14 +170,20 @@ function initializeCharacterPage(scriptText) {
     voiceNote.setAttribute("aria-live", "polite");
 
     controls.append(voiceLabel, rateControl.wrapper, pitchControl.wrapper, voiceNote);
-    card.append(headerRow, controls);
-    rolesList.append(card);
+    card.append(headerRow, includeRow, controls);
+    const cardList = initiallyExcludedRoles.has(role)
+      ? excludedRolesPanel
+      : includedRolesList;
+    cardList.append(card);
 
     roleElements.set(role, {
       card,
       radio,
       roleMeta,
       lineCount,
+      includeToggle,
+      controls,
+      previewButton,
       voiceSelect,
       voiceNote,
       rateValue: rateControl.valueLabel,
@@ -194,25 +239,61 @@ function initializeCharacterPage(scriptText) {
     range.style.setProperty("--range-pct", `${percentage}%`);
   }
 
-  function updateSelectedRole() {
+  function updateRoleCards() {
     for (const [role, elements] of roleElements) {
       const selected = role === selectedRole;
+      const included = includedRoles.has(role);
+      elements.includeToggle.checked = included;
+      elements.includeToggle.disabled = selected;
+      elements.controls.hidden = !included;
+      elements.previewButton.hidden = !included;
+
       elements.card.classList.toggle("bg-primary-soft", selected);
-      elements.card.classList.toggle("bg-surface", !selected);
+      elements.card.classList.toggle("bg-surface", included && !selected);
+      elements.card.classList.toggle("bg-surface-sub", !included);
+      elements.card.classList.toggle("p-lg", included);
+      elements.card.classList.toggle("p-md", !included);
+      elements.card.classList.toggle("shadow-card", included);
       elements.roleMeta.textContent = selected
         ? `내 배역 · 대사 ${elements.lineCount}줄`
-        : `대사 ${elements.lineCount}줄`;
+        : included
+          ? `대사 ${elements.lineCount}줄`
+          : `대사 ${elements.lineCount}줄 · 읽기 제외`;
       elements.roleMeta.classList.toggle("text-primary", selected);
       elements.roleMeta.classList.toggle("font-semibold", selected);
       elements.roleMeta.classList.toggle("text-ink-tertiary", !selected);
       elements.roleMeta.classList.toggle("font-medium", !selected);
     }
+
+    startButton.disabled = includedRoles.size < 2;
+    if (includedRoles.size < 2) {
+      roleIncludeError.textContent =
+        "연습하려면 읽기에 포함할 배역을 2개 이상 골라주세요.";
+    }
+
+    updateVoiceOverlapNote();
+  }
+
+  if (initialRolePartition.excluded.length > 0) {
+    excludedRolesSummary.textContent =
+      `대사 1줄 이하라 ${initialRolePartition.excluded.length}개 뺐어요`;
+    excludedRolesSection.classList.remove("hidden");
+    excludedRolesToggle.addEventListener("click", () => {
+      const expanded =
+        excludedRolesToggle.getAttribute("aria-expanded") === "true";
+      excludedRolesToggle.setAttribute("aria-expanded", String(!expanded));
+      excludedRolesPanel.classList.toggle("hidden", expanded);
+      excludedRolesAction.textContent = expanded ? "펼치기" : "접기";
+    });
+  } else {
+    excludedRolesSection.remove();
   }
 
   function updateVoiceOverlapNote() {
+    const includedCount = includedRoles.size;
     overlapNote.textContent =
-      koVoices.length < roles.length
-        ? `이 기기에서는 한국어 음성이 ${koVoices.length}개라 배역 ${roles.length}개 중 일부는 속도·피치로만 구분됩니다.`
+      koVoices.length < includedCount
+        ? `이 기기에서는 한국어 음성이 ${koVoices.length}개라 포함한 배역 ${includedCount}개 중 일부는 속도·피치로만 구분됩니다.`
         : "";
 
     // getKoreanVoices()가 localService를 우선 정렬해 두므로, 있다면 항상 koVoices[0]이
@@ -302,7 +383,25 @@ function initializeCharacterPage(scriptText) {
 
     if (target.matches('input[name="myRole"]')) {
       selectedRole = target.value;
-      updateSelectedRole();
+      includedRoles.add(selectedRole);
+      roleIncludeError.textContent = "";
+      updateRoleCards();
+      return;
+    }
+
+    if (target.matches("input[data-include-role]")) {
+      const role = target.dataset.includeRole;
+      if (!target.checked && includedRoles.size <= 2) {
+        target.checked = true;
+        roleIncludeError.textContent =
+          "상대 배역을 읽으려면 배역 2개 이상을 포함해야 해요.";
+        return;
+      }
+
+      if (target.checked) includedRoles.add(role);
+      else includedRoles.delete(role);
+      roleIncludeError.textContent = "";
+      updateRoleCards();
       return;
     }
 
@@ -335,8 +434,10 @@ function initializeCharacterPage(scriptText) {
     const header = event.target.closest("[data-role-picker-header]");
     if (!header) return;
     selectedRole = header.dataset.rolePickerHeader;
+    includedRoles.add(selectedRole);
     roleElements.get(selectedRole).radio.checked = true;
-    updateSelectedRole();
+    roleIncludeError.textContent = "";
+    updateRoleCards();
   });
 
   const cueNotice = document.getElementById("cueNotice");
@@ -382,7 +483,13 @@ function initializeCharacterPage(scriptText) {
     window.location.href = "/input";
   });
 
-  document.getElementById("startButton").addEventListener("click", () => {
+  startButton.addEventListener("click", () => {
+    if (includedRoles.size < 2) {
+      roleIncludeError.textContent =
+        "연습하려면 읽기에 포함할 배역을 2개 이상 골라주세요.";
+      return;
+    }
+
     unlockSpeechSynthesis();
     const selectedMode = document.querySelector(
       'input[name="advanceMode"]:checked',
@@ -391,9 +498,15 @@ function initializeCharacterPage(scriptText) {
       'input[name="engine"]:checked',
     ).value;
 
+    const includedRoleParams = Object.fromEntries(
+      roles
+        .filter((role) => includedRoles.has(role))
+        .map((role) => [role, roleParams[role]]),
+    );
+
     savePracticeSettings({
       myRole: selectedRole,
-      roleParams,
+      roleParams: includedRoleParams,
       advanceMode: selectedMode,
       silenceSec: Number.parseFloat(silenceSec.value),
       engine: selectedEngine,
@@ -413,7 +526,7 @@ function initializeCharacterPage(scriptText) {
     };
   }
 
-  updateSelectedRole();
   repopulateVoiceSelects();
+  updateRoleCards();
   updateRangeFill(silenceSec);
 }

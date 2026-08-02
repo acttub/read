@@ -28,7 +28,8 @@ function validateScript() {
 
   if (parseScript(script).roles.length === 0) {
     continueButton.disabled = true;
-    scriptError.textContent = "배역명: 대사 형식인지 확인해 주세요.";
+    scriptError.textContent =
+      "배역명과 대사가 구분되어 있는지 확인해 주세요.";
     return false;
   }
 
