@@ -65,9 +65,14 @@
   /* ② 주요 버튼을 셸 전체 폭으로 늘리지 않는다. 680px 파란 띠는 광고 배너로 읽힌다.
      상한은 새로 지어낸 치수가 아니라 폰에서의 버튼 폭이다(375 − 좌우 20×2 = 335px
      → 21rem = 336px. rem으로 두면 사용자가 글자를 키웠을 때 버튼도 같이 큰다).
-     #actionSlot은 /prac — 그 화면 마크업은 이번 작업에서 못 건드려서 id로 잡는다. */
+     #actionSlot은 /prac — 그 화면 마크업은 이번 작업에서 못 건드려서 id로 잡는다.
+     구조 선택자 두 줄은 /prac 커밋본용이다(디스크본과 마크업이 다르다): 푸터의 첫
+     자식이 버튼 줄이고, 그 아래 안내문(p)이 가운데 정렬이라 버튼만 좁히면 안내문
+     혼자 셸 한가운데에 남아 따로 논다. */
   .wide-action,
-  #actionSlot {
+  #actionSlot,
+  #readingSurface > .tier-shell > footer > div:first-child,
+  #readingSurface > .tier-shell > footer > p {
     max-width: 21rem;
   }
 }
@@ -103,5 +108,98 @@
   #lineDisplay.font-semibold,
   #currentLineText.font-semibold {
     font-size: var(--text-h1);
+  }
+}
+
+/* ── 데스크톱 배치는 화면마다 따로 짠다 ────────────────────────────────
+   위 블록까지는 "한 열 그대로, 여백·글자만 한 단"이었다. 그걸로는 폰 컴포넌트가
+   가로로 늘어난 모양이 남는다 — 680px 막대 안에 글자는 왼쪽 구석에만 있고,
+   가려진 대사 24점은 한 줄로 퍼져 구분선처럼 보였다.
+
+   그래서 넓은 화면에서는 배치 자체를 바꾼다. 셸 폭(desktop 760px)은 그대로 둔다 —
+   재보니 680px 콘텐츠 폭이 필요한 배치를 전부 담는다(입력 방법 3열, 조작 3개 가로).
+   폭을 더 늘리면 얻는 건 없고 30px 대사의 글줄만 길어진다.
+
+   여기 있는 규칙은 전부 min-width:1024px 안에 있다 — 폰(390px) 픽셀은 안 건드린다. */
+@media (min-width: 1024px) {
+  /* ── /input · 대본 넣는 방법 3개를 가로로 ────────────────────────────
+     세로로 쌓으면 680×72 막대 셋이 된다. 가로로 놓으면 216px 타일 셋이라
+     "고르는 것"으로 읽힌다. `.grid`로 좁힌 이유: /quiz에도 #emptyState가
+     있는데(대사 없음 안내) 그건 grid가 아니라 여기 걸리면 안 된다. */
+  #emptyState.grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    /* 행 간격을 0으로 두는 이유: 아래 예시 블록이 같은 그리드의 두 번째 행이라
+       row-gap이 그 블록의 mt-xl(40px)에 더해져 토큰에 없는 값이 된다. */
+    row-gap: 0;
+    column-gap: var(--spacing-md);
+  }
+
+  #emptyState.grid > button {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    /* 타일 높이도 지어내지 않는다 — 간격 토큰의 배수. 셋 중 하나(직접 쓰기)는
+       설명 줄이 없어서, 높이를 안 주면 제목만 붙은 얇은 타일이 된다. */
+    min-height: calc(var(--spacing-xxl) + var(--spacing-xl));
+    padding: var(--spacing-lg);
+  }
+
+  /* 예시("이런 모양이면 돼요")는 타일이 아니라 그 아래 한 줄이다. */
+  #emptyState.grid > div {
+    grid-column: 1 / -1;
+  }
+
+  /* ── /char · 배역 타일 3열 ──────────────────────────────────────────
+     2열이면 타일 하나가 336px인데 안에는 이름과 "대사 N줄"뿐이다.
+     모드 선택도 같은 3열 리듬에 얹어 배역 타일과 같은 폭으로 맞춘다. */
+  #includedRolesList,
+  #rolesList > fieldset {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  /* ── /quiz · 조작은 대사 아래 가로로 ────────────────────────────────
+     세로로 쌓으면 대사 카드 아래에 버튼 기둥이 서고 화면 아래가 통째로 빈다.
+     `:not([hidden])`이 필요하다 — id 선택자가 [hidden]의 display:none을 이긴다. */
+  #actionArea:not([hidden]) {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+  }
+
+  /* 묶음 안에서도 가로로 — 폰에서는 세로로 쌓는 게 맞지만(엄지) 넓은 화면에서
+     336px 버튼이 세로로 두 개 쌓이면 그게 다시 기둥이 된다. */
+  #actionArea > div {
+    display: flex;
+    flex: 1 1 0;
+    gap: var(--spacing-sm);
+    margin-top: 0;
+  }
+
+  #actionArea > div > button {
+    flex: 1 1 0;
+  }
+}
+
+@media (min-width: 1024px) and (min-height: 700px) {
+  /* ── /quiz · /prac · 대사가 주인공이면 카드가 무대여야 한다 ──────────
+     지금은 카드가 대사 한 줄 높이라 화면 위쪽에 얇게 떠 있고 아래 절반이 빈다.
+     높이를 간격 토큰의 배수로 고정하고(카드 위치가 매 턴 고정된다) 그 안에서
+     세로 가운데에 둔다. 헤더는 카드 위에 있으므로 줄 길이가 바뀌어도 안 움직인다. */
+  #lineCard,
+  #currentLineCard {
+    min-height: calc(var(--spacing-xxl) * 4);
+    justify-content: center;
+  }
+
+  #lineCard {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 가려진 대사는 24점까지인데, 30px에서 그게 600px 한 줄이라 구분선으로 읽힌다.
+     폰에서는 두 줄로 접혀 "가려진 글"로 보이므로 넓은 화면에서도 접히게 한다.
+     em이라 점 크기가 바뀌어도 한 줄에 들어가는 점 수가 유지된다. */
+  #lineDisplay[data-masked] {
+    max-width: 14em;
   }
 }

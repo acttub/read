@@ -156,7 +156,7 @@ function initializeQuiz() {
     stopRecognition();
     state.voiceMode = enabled;
     phase = phase === "listening" ? "ready" : phase;
-    speakButton.textContent = "🎙️ 말하기";
+    speakButton.textContent = "말하기";
     setNotice(message);
     syncModeControls();
   }
@@ -177,10 +177,17 @@ function initializeQuiz() {
     }).filter(Boolean).join(" ");
   }
 
+  // data-masked는 CSS만 쓴다 — 가려진 점은 넓은 화면에서 한 줄로 퍼지면
+  // 구분선처럼 보여서, 그때만 글줄 폭을 좁혀 접는다(src/input.css).
+  function setLine(text, { masked = false } = {}) {
+    lineDisplay.textContent = text;
+    lineDisplay.toggleAttribute("data-masked", masked);
+  }
+
   function renderMaskedLine(turn) {
-    lineDisplay.textContent = maskedText(
-      turn.text,
-      state.hintWords.get(state.index) || 0,
+    setLine(
+      maskedText(turn.text, state.hintWords.get(state.index) || 0),
+      { masked: true },
     );
   }
 
@@ -210,7 +217,7 @@ function initializeQuiz() {
     stopRecognition();
     if (remember) state.status.set(state.index, "revealed");
     phase = "revealed";
-    lineDisplay.textContent = turn.text;
+    setLine(turn.text);
     differentWords.hidden = true;
     setOnlyActions(nextButton, retryButton);
   }
@@ -233,7 +240,7 @@ function initializeQuiz() {
     if (!turn) return;
     markPassed(state.index);
     phase = "passing";
-    lineDisplay.textContent = turn.text;
+    setLine(turn.text);
     differentWords.hidden = true;
     setOnlyActions();
     passTimer = window.setTimeout(advanceTurn, 650);
@@ -275,7 +282,7 @@ function initializeQuiz() {
       return different < selectedDifferent ? result : selected;
     });
     phase = "failed";
-    lineDisplay.textContent = "";
+    setLine("");
     renderDifferentWords(closest.segments);
     setOnlyActions(retryButton, overrideButton, originalButton);
   }
@@ -377,7 +384,7 @@ function initializeQuiz() {
       instance.onend = null;
       clearRecognitionWatchdog();
       releaseMic();
-      speakButton.textContent = "🎙️ 말하기";
+      speakButton.textContent = "말하기";
     }
 
     instance.onstart = markActivity;
@@ -488,7 +495,7 @@ function initializeQuiz() {
     roleName.textContent = turn.role;
 
     if (turn.isDirection) {
-      lineDisplay.textContent = turn.text;
+      setLine(turn.text);
       lineDisplay.className =
         "m-0 min-h-[3.5rem] font-script text-body-lg font-medium leading-[1.6] text-ink-sub";
       setOnlyActions();
@@ -499,7 +506,7 @@ function initializeQuiz() {
     lineDisplay.className =
       "m-0 min-h-[3.5rem] font-script text-[22px] font-semibold leading-[1.5] text-ink";
     if (turn.role !== myRole) {
-      lineDisplay.textContent = turn.text;
+      setLine(turn.text);
       setOnlyActions(nextButton);
       return;
     }
