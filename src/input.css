@@ -27,3 +27,81 @@
 @theme {
   --font-script: "Apple SD Gothic Neo", "Noto Sans KR", -apple-system, BlinkMacSystemFont, sans-serif;
 }
+
+/* ── 넓은 화면에서 폰 레이아웃이 새는 것을 막는다 ───────────────────────
+   화면 4개가 전부 `header / main.flex-1 / footer` 골격이다. 폰에서는 이게 맞다 —
+   콘텐츠는 위, 조작은 엄지가 닿는 화면 바닥. 그런데 뷰포트가 커지면 `flex-1`이
+   그 사이를 통째로 벌려서, 1440×900에서 대사 카드와 버튼 사이가 470px 빈다.
+
+   DESIGN.md `## Layout`: "폭을 늘리는 게 아니라 여백·글자 크기를 한 단 키우고
+   남는 자리를 배경이 받게 한다." 셸 폭(desktop 760px)은 정본이라 손대지 않는다.
+
+   ⚠️ 폭만 보고 걸면 안 된다. 가로로 누운 폰(844×390)도 tablet 티어라, 폭 조건만
+   쓰면 화면에 다 들어가지도 않는데 하단 고정만 풀리는 최악이 된다. 높이를 같이 본다.
+   ⚠️ 세로 가운데 정렬은 쓰지 않았다. /quiz·/prac은 줄마다 카드 높이가 달라져서
+   가운데로 모으면 매 턴 헤더가 위아래로 움직인다 — DESIGN.md "원래 있던 UI를
+   화면 전환 때 움직이기"에 걸린다. 위를 고정하고 남는 자리를 아래 배경이 받게 한다. */
+@media (min-width: 600px) and (min-height: 700px) {
+  /* ① 하단 고정을 푼다 — 조작이 콘텐츠 바로 아래로 온다. 구멍이 사라진다. */
+  .tier-shell > main {
+    flex: 0 0 auto;
+  }
+
+  .tier-shell > footer {
+    margin-top: 0;
+  }
+
+  /* sticky는 폰에서 CTA를 화면 안에 붙들어두는 장치다. 화면이 넓고 높으면
+     그럴 이유가 없고, 붙어 있으면 그게 곧 구멍의 아래쪽 벽이 된다. */
+  .tier-shell > footer.tier-sticky-bottom {
+    position: static;
+    /* sticky일 때의 위 여백(spacing-sm)은 "떠 있는 바와 콘텐츠 사이"용이라 8px다.
+       고정이 풀리면 그냥 붙어버리므로 섹션 간격으로 돌려놓는다. */
+    padding-top: var(--spacing-lg);
+    padding-bottom: 0;
+    background: none;
+  }
+
+  /* ② 주요 버튼을 셸 전체 폭으로 늘리지 않는다. 680px 파란 띠는 광고 배너로 읽힌다.
+     상한은 새로 지어낸 치수가 아니라 폰에서의 버튼 폭이다(375 − 좌우 20×2 = 335px
+     → 21rem = 336px. rem으로 두면 사용자가 글자를 키웠을 때 버튼도 같이 큰다).
+     #actionSlot은 /prac — 그 화면 마크업은 이번 작업에서 못 건드려서 id로 잡는다. */
+  .wide-action,
+  #actionSlot {
+    max-width: 21rem;
+  }
+}
+
+@media (min-width: 1024px) and (min-height: 700px) {
+  /* ③ 여백을 한 단 키운다. 값은 spacing 토큰에서만 가져온다
+     (DESIGN.md `## Layout`: 섹션 사이는 40~64). */
+  .tier-shell {
+    padding-top: var(--spacing-xxl);
+  }
+
+  /* 두 벌로 적는 이유: sticky 쪽이 클래스를 하나 더 달고 있어 더 구체적이다. */
+  .tier-shell > footer,
+  .tier-shell > footer.tier-sticky-bottom {
+    padding-top: var(--spacing-xl);
+  }
+
+  /* ④ 대사 카드는 이 두 화면의 주인공이다. 680px 카드 왼쪽 구석에 22px 한 줄만
+     찍히면 카드가 비어 보인다. 글자와 안쪽 여백을 한 단 키운다 —
+     크기도 지어내지 않고 토큰에서 가져온다(h1 30px · spacing-xl 40px).
+
+     `.font-semibold`로 좁힌 이유: 지문일 때 JS가 className을 text-body-lg /
+     font-medium으로 통째로 갈아끼운다. 지문까지 같이 커지면 대사와 구분이 사라진다.
+
+     ⚠️ 좌우를 40이 아니라 24로 둔 이유가 있다. /quiz가 대사를 가릴 때 쓰는 마스크는
+     `•` 24개까지인데, 30px에서 그게 정확히 600px다. 좌우도 40이면 글줄이 600px가 되어
+     마지막 점 하나가 다음 줄로 떨어진다 — 고아 점 하나가 카드에서 제일 먼저 눈에 띈다. */
+  #lineCard,
+  #currentLineCard {
+    padding: var(--spacing-xl) var(--spacing-lg);
+  }
+
+  #lineDisplay.font-semibold,
+  #currentLineText.font-semibold {
+    font-size: var(--text-h1);
+  }
+}
