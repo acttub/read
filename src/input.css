@@ -105,8 +105,14 @@
     padding: var(--spacing-xl) var(--spacing-lg);
   }
 
+  /* 지문(isDirection)은 font-normal·font-medium이라 여기 안 걸린다 — 대사만 키운다.
+     굵기 클래스로 좁히는 이유는 /prac이 턴마다 className을 통째로 갈아끼우기 때문이다.
+     font-bold는 배포된 /prac, font-semibold는 /quiz와 작업 중인 /prac이 쓴다.
+     ⚠️ /prac의 굵기가 바뀌면 여기도 같이 봐야 한다 — 안 그러면 카드만 커지고
+     대사는 22px로 남는다. */
   #lineDisplay.font-semibold,
-  #currentLineText.font-semibold {
+  #currentLineText.font-semibold,
+  #currentLineText.font-bold {
     font-size: var(--text-h1);
   }
 }

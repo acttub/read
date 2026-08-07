@@ -185,10 +185,10 @@ function initializeQuiz() {
   }
 
   function renderMaskedLine(turn) {
-    setLine(
-      maskedText(turn.text, state.hintWords.get(state.index) || 0),
-      { masked: true },
-    );
+    const text = maskedText(turn.text, state.hintWords.get(state.index) || 0);
+    // 힌트로 어절이 전부 드러나면 더 이상 마스크가 아니다. 그때도 data-masked를
+    // 남기면 데스크톱에서 드러난 원문이 좁은 글줄 폭(14em)에 묶여 어색하게 접힌다.
+    setLine(text, { masked: text.includes("•") });
   }
 
   function renderDifferentWords(segments) {
