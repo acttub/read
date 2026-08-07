@@ -1,7 +1,7 @@
 /* acttub 서브프로젝트 공용 티어 분기 유틸.
-   tools/brand-tokens-export.py가 생성한다. 이 파일을 직접 고치지 않는다 —
-   티어 경계를 바꾸려면 brand/DESIGN.md의 `breakpoints:`를 고치고 다시 생성한다.
-   경계 숫자가 brand/responsive-base.css와 항상 같아야 하므로 둘을 같이 생성한다. */
+   도구/brand-tokens-export.py가 생성한다. 이 파일을 직접 고치지 않는다 —
+   티어 경계를 바꾸려면 브랜드/DESIGN.md의 `breakpoints:`를 고치고 다시 생성한다.
+   경계 숫자가 브랜드/responsive-base.css와 항상 같아야 하므로 둘을 같이 생성한다. */
 
 export const BREAKPOINTS = Object.freeze({
   tablet: 600,

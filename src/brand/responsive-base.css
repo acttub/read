@@ -1,6 +1,6 @@
 /* acttub 서브프로젝트 공용 반응형 baseline — 3단 티어 + 기기 하드닝.
-   tools/brand-tokens-export.py가 생성한다. 이 파일을 직접 고치지 않는다 —
-   티어 경계를 바꾸려면 brand/DESIGN.md의 `breakpoints:`를 고치고 다시 생성한다.
+   도구/brand-tokens-export.py가 생성한다. 이 파일을 직접 고치지 않는다 —
+   티어 경계를 바꾸려면 브랜드/DESIGN.md의 `breakpoints:`를 고치고 다시 생성한다.
 
    ⚠️ 이 파일만으로는 노치·홈바 대응이 켜지지 않는다. HTML에 아래 meta가 있어야
    env(safe-area-inset-*)가 0이 아닌 값을 준다:
@@ -9,7 +9,7 @@
    확대가 막힌다(저시력 사용자가 못 읽는다). iOS는 무시하므로 되는 것처럼 보일 뿐이다.
 
    가로 넘침(overflow-x)을 여기서 숨기지 않는다. `overflow-x: hidden`은 깨진 레이아웃을
-   감추기만 하고 고치지 않는다. 넘침은 tools/device-matrix.py가 기기별로 잡아낸다. */
+   감추기만 하고 고치지 않는다. 넘침은 도구/device-matrix.py가 기기별로 잡아낸다. */
 
 :root {
   /* 노치·홈바. viewport-fit=cover가 없으면 전부 0이다(폴백이 동작). */
@@ -95,7 +95,7 @@
 
 /* ── 티어 전용 표시 ──
    싼 경우(문구 한 줄, 아이콘 유무)의 탈출구다. 화면 구조가 갈리면 이걸 쓰지 말고
-   컴포넌트 파일을 나눈다(`*.phone.tsx` / `*.desktop.tsx` + brand/responsive-tier.js).
+   컴포넌트 파일을 나눈다(`*.phone.tsx` / `*.desktop.tsx` + 브랜드/responsive-tier.js).
    이유: CSS로 숨겨도 양쪽 DOM이 다 그려지고 이미지도 다 받는다. 스크린리더는
    숨긴 쪽도 읽을 수 있고, 폰에서 데스크톱 화면만큼의 데이터를 내려받게 된다. */
 @media (max-width: 599.98px) {

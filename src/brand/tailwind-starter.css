@@ -1,5 +1,5 @@
-/* brand/DESIGN.md 토큰 → Tailwind v4 테마.
-   tools/brand-tokens-export.py가 생성한다. 이 파일을 직접 고치지 않는다 —
+/* 브랜드/DESIGN.md 토큰 → Tailwind v4 테마.
+   도구/brand-tokens-export.py가 생성한다. 이 파일을 직접 고치지 않는다 —
    값을 바꾸려면 DESIGN.md를 고치고 다시 생성한다.
    라이트 전용이다. 제품 화면에 어두운 배경을 만들지 않는다. */
 @theme {
@@ -44,7 +44,7 @@
 
   /* 글자 — 폰트 파일은 각 프로젝트가 따로 실어야 한다.
      이 블록은 '무슨 글꼴을 쓴다'만 정하지 글꼴을 불러오지 않는다.
-     brand/fonts/의 Pretendard를 @font-face로 걸거나 next/font로 싣는다. */
+     브랜드/fonts/의 Pretendard를 @font-face로 걸거나 next/font로 싣는다. */
   --font-sans: "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", -apple-system, BlinkMacSystemFont, sans-serif;
   --text-h1: 1.875rem;
   --text-h1--font-weight: 700;
