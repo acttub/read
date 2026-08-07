@@ -157,8 +157,8 @@ test("프로덕션 호스트가 아니면 이벤트를 전송하지 않는다", 
   assert.equal(sent, 0);
 });
 
-test("localhost에서는 세 페이지 모두 gtag 스크립트를 로드하지 않는다", async () => {
-  for (const page of ["input", "char", "prac"]) {
+test("localhost에서는 네 페이지 모두 gtag 스크립트를 로드하지 않는다", async () => {
+  for (const page of ["input", "char", "prac", "quiz"]) {
     const result = runGaSnippet(await readGaSnippet(page), "localhost");
     assert.equal(result.appendedScripts.length, 0, page);
     assert.equal(result.window.gtag, undefined, page);
@@ -166,8 +166,8 @@ test("localhost에서는 세 페이지 모두 gtag 스크립트를 로드하지 
   }
 });
 
-test("세 페이지 모두 consent denied를 config보다 먼저 dataLayer에 넣는다", async () => {
-  for (const page of ["input", "char", "prac"]) {
+test("네 페이지 모두 consent denied를 config보다 먼저 dataLayer에 넣는다", async () => {
+  for (const page of ["input", "char", "prac", "quiz"]) {
     const result = runGaSnippet(await readGaSnippet(page), "read.acttub.com");
     assert.equal(result.appendedScripts.length, 1, page);
     assert.equal(

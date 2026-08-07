@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>대사 암기 테스트 · acttub</title>
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="stylesheet" href="/styles.css">
+    <!-- GA4. 프로덕션 호스트에서만 로드한다 — 로컬·프리뷰 유입은 집계하지 않는다. -->
+    <script>
+    (function(){
+      if(!/(^|\.)acttub\.com$/.test(location.hostname))return;
+      var ID='G-DRMEWBN9Y9';
+      var s=document.createElement('script');
+      s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id='+ID;
+      document.head.appendChild(s);
+      window.dataLayer=window.dataLayer||[];
+      window.gtag=function(){window.dataLayer.push(arguments);};
+      window.gtag('js',new Date());
+      window.gtag('consent','default',{analytics_storage:'denied'});
+      window.gtag('config',ID);
+    })();
+    </script>
+  </head>
+  <body class="m-0 bg-neutral font-sans text-ink">
+    <div class="tier-root bg-neutral">
+      <div class="tier-shell flex min-h-[var(--app-min-h)] flex-col pt-md">
+        <header>
+          <div class="flex min-h-11 items-center justify-between gap-md">
+            <button id="exitButton" type="button" class="inline-flex min-h-11 items-center gap-xs bg-transparent px-xs text-body-sm font-semibold text-ink-sub">
+              <span aria-hidden="true">✕</span>
+              <span>나가기</span>
+            </button>
+            <div id="modeControls" class="flex items-center gap-xs" role="radiogroup" aria-label="음성 모드 / 무음 모드">
+              <label class="relative inline-flex min-h-11 cursor-pointer items-center rounded-pill px-sm text-[13px] font-semibold text-ink-sub has-checked:bg-primary-soft has-checked:text-primary-strong">
+                <input id="voiceModeInput" class="absolute inset-0 m-0 h-full w-full cursor-pointer appearance-none opacity-0" type="radio" name="quizMode" value="voice">
+                <span>음성 모드</span>
+              </label>
+              <label class="relative inline-flex min-h-11 cursor-pointer items-center rounded-pill px-sm text-[13px] font-semibold text-ink-sub has-checked:bg-primary-soft has-checked:text-primary-strong">
+                <input id="silentModeInput" class="absolute inset-0 m-0 h-full w-full cursor-pointer appearance-none opacity-0" type="radio" name="quizMode" value="silent">
+                <span>무음 모드</span>
+              </label>
+            </div>
+          </div>
+          <p id="voiceDisclosure" class="mb-0 mt-sm text-[12px] font-medium text-ink-sub">말소리를 브라우저 벤더 서버로 보낸다.</p>
+          <p id="modeNotice" class="mb-0 mt-sm text-[13px] font-medium text-ink-sub empty:hidden" aria-live="polite"></p>
+        </header>
+
+        <main class="flex min-h-0 flex-1 flex-col pt-lg">
+          <section id="emptyState" class="my-auto rounded-lg bg-surface p-5 shadow-card" hidden>
+            <p class="m-0 text-h2">고른 배역에 대사가 없어요</p>
+            <a href="/char" class="btn mt-lg inline-flex h-14 w-full items-center justify-center rounded-lg bg-primary-strong font-bold text-white active:bg-primary-deep">배역 고르기</a>
+          </section>
+
+          <section id="quizStage" class="flex min-h-0 flex-1 flex-col">
+            <div id="lineCard" class="rounded-lg bg-surface p-5 shadow-card">
+              <p id="roleName" class="mb-sm mt-0 text-label text-primary-strong"></p>
+              <p id="lineDisplay" class="m-0 min-h-[3.5rem] font-script text-[22px] font-semibold leading-[1.5] text-ink" aria-live="polite"></p>
+              <div id="differentWords" class="mt-md flex flex-wrap gap-xs" hidden></div>
+            </div>
+          </section>
+
+          <section id="completionState" class="my-auto" hidden>
+            <section id="reviewSection" class="mb-xl" hidden>
+              <h2 class="m-0 text-h2">아직 안 나온 줄</h2>
+              <div id="reviewList" class="mt-md space-y-sm"></div>
+            </section>
+            <div class="rounded-lg bg-surface p-5 shadow-card">
+              <h1 class="m-0 text-h1">여기까지가 글자예요.</h1>
+              <a id="coreLink" href="https://acttub.com" class="btn mt-lg inline-flex min-h-11 items-center text-body-lg font-semibold text-primary-strong underline underline-offset-4">이 인물이 왜 이 말을 하는지는 — acttub에서 질문으로 →</a>
+            </div>
+          </section>
+        </main>
+
+        <footer id="actionArea" class="tier-sticky-bottom mt-auto pt-lg" hidden>
+          <div class="grid gap-sm">
+            <button id="speakButton" type="button" class="h-14 w-full rounded-lg bg-primary-strong font-bold text-white active:bg-primary-deep" hidden>🎙️ 말하기</button>
+            <button id="silentRecallButton" type="button" class="h-14 w-full rounded-lg bg-primary-strong font-bold text-white active:bg-primary-deep" hidden>떠올렸어요</button>
+            <button id="nextButton" type="button" class="h-14 w-full rounded-lg bg-primary-strong font-bold text-white active:bg-primary-deep" hidden>넘어가기</button>
+            <button id="retryButton" type="button" class="h-14 w-full rounded-lg bg-primary-soft font-bold text-primary-strong active:bg-primary-soft-hover" hidden>다시</button>
+            <button id="overrideButton" type="button" class="h-14 w-full rounded-lg bg-primary-soft font-bold text-primary-strong active:bg-primary-soft-hover" hidden>맞게 말했는데</button>
+          </div>
+          <div class="mt-sm grid grid-cols-2 gap-sm">
+            <button id="hintButton" type="button" class="h-12 w-full rounded-lg bg-surface font-semibold text-primary-strong shadow-card active:bg-primary-soft" hidden>힌트</button>
+            <button id="originalButton" type="button" class="h-12 w-full rounded-lg bg-surface font-semibold text-primary-strong shadow-card active:bg-primary-soft" hidden>원문 보기</button>
+          </div>
+        </footer>
+      </div>
+    </div>
+    <script type="module" src="/app/quiz.js"></script>
+  </body>
+</html>

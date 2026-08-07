@@ -10,7 +10,12 @@ import {
   supportsSpeechSynthesis,
   unlockSpeechSynthesis,
 } from "./voices.js";
-import { readScript, savePracticeSettings } from "./storage.js";
+import {
+  readMode,
+  readScript,
+  saveMode,
+  savePracticeSettings,
+} from "./storage.js";
 import { trackEvent, trackMetric } from "./tracking.js";
 
 const script = readScript();
@@ -53,6 +58,8 @@ function initializeCharacterPage(scriptText) {
     "advanceSettingsSummary",
   );
   const startButton = document.getElementById("startButton");
+  const readingDescription = document.getElementById("readingDescription");
+  const readingSettings = document.getElementById("readingSettings");
   const roleParams = {};
   const roleElements = new Map();
   const {
@@ -72,6 +79,12 @@ function initializeCharacterPage(scriptText) {
   ];
   let selectedRole = initialSelectedRole;
   let koVoices = getKoreanVoices();
+
+  function getSelectedProductMode() {
+    return document.querySelector(
+      'input[name="practiceMode"]:checked',
+    ).value;
+  }
 
   roles.forEach((role, index) => {
     const palette = ROLE_VOICE_PALETTE[index % ROLE_VOICE_PALETTE.length];
@@ -383,6 +396,7 @@ function initializeCharacterPage(scriptText) {
 
   function updateRoleUI() {
     const deviceEngine = getSelectedEngine() === "device";
+    const quizMode = getSelectedProductMode() === "quiz";
 
     for (const [role, elements] of roleElements) {
       const selected = role === selectedRole;
@@ -416,14 +430,23 @@ function initializeCharacterPage(scriptText) {
         elements.selectedNote.hidden && elements.deviceControls.hidden;
     }
 
-    startButton.disabled = includedRoles.size < 2;
-    if (includedRoles.size < 2) {
+    startButton.disabled = !selectedRole || (!quizMode && includedRoles.size < 2);
+    if (!quizMode && includedRoles.size < 2) {
       roleIncludeError.textContent =
         "연습하려면 읽기에 포함할 배역을 2개 이상 골라주세요.";
+    } else if (quizMode) {
+      roleIncludeError.textContent = "";
     }
 
     updateSettingsSummaries();
     updateVoiceOverlapNote();
+  }
+
+  function syncProductMode() {
+    const quizMode = getSelectedProductMode() === "quiz";
+    readingDescription.hidden = quizMode;
+    readingSettings.hidden = quizMode;
+    updateRoleUI();
   }
 
   function updateVoiceOverlapNote() {
@@ -639,6 +662,10 @@ function initializeCharacterPage(scriptText) {
     radio.addEventListener("change", syncEngineOptions);
   });
 
+  document.querySelectorAll('input[name="practiceMode"]').forEach((radio) => {
+    radio.addEventListener("change", syncProductMode);
+  });
+
   silenceSec.addEventListener("input", () => {
     updateRangeFill(silenceSec);
     silenceSecLabel.textContent =
@@ -651,13 +678,14 @@ function initializeCharacterPage(scriptText) {
   });
 
   startButton.addEventListener("click", () => {
-    if (includedRoles.size < 2) {
+    const productMode = getSelectedProductMode();
+    if (productMode === "read" && includedRoles.size < 2) {
       roleIncludeError.textContent =
         "연습하려면 읽기에 포함할 배역을 2개 이상 골라주세요.";
       return;
     }
 
-    unlockSpeechSynthesis();
+    if (productMode === "read") unlockSpeechSynthesis();
     const selectedMode = getSelectedAdvanceMode();
     const selectedEngine = getSelectedEngine();
     const includedRoleParams = Object.fromEntries(
@@ -674,11 +702,12 @@ function initializeCharacterPage(scriptText) {
       engine: selectedEngine,
       voiceId: cloudVoiceId.value,
     });
+    saveMode(productMode);
     trackEvent("char_select");
     if (roles.length === 1) trackMetric("roles_1");
     else if (roles.length === 2) trackMetric("roles_2");
     else if (roles.length >= 3) trackMetric("roles_3plus");
-    window.location.href = "/prac";
+    window.location.href = productMode === "quiz" ? "/quiz" : "/prac";
   });
 
   if (supportsSpeechSynthesis()) {
@@ -689,7 +718,14 @@ function initializeCharacterPage(scriptText) {
   }
 
   repopulateVoiceSelects();
+  const initialProductMode = location.hostname.startsWith("cue.")
+    ? "quiz"
+    : readMode();
+  document.querySelector(
+    `input[name="practiceMode"][value="${initialProductMode}"]`,
+  ).checked = true;
   syncAdvanceModeOptions();
   syncEngineOptions();
+  syncProductMode();
   updateRangeFill(silenceSec);
 }

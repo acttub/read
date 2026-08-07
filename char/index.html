@@ -190,7 +190,7 @@
             <p class="m-0 shrink-0 text-[13px] font-medium tabular-nums text-ink-sub">2 / 3</p>
           </div>
           <h1 class="m-0 text-h1">어느 배역이세요?</h1>
-          <p class="mb-0 mt-sm text-body-lg text-ink-sub">
+          <p id="readingDescription" class="mb-0 mt-sm text-body-lg text-ink-sub">
             고른 배역은 읽지 않고 기다릴게요.<br>
             나머지 배역을 소리로 읽어드려요.
           </p>
@@ -217,7 +217,18 @@
 
           <p id="roleIncludeError" class="mb-0 mt-md text-[13px] font-medium text-danger empty:hidden" aria-live="polite"></p>
 
-          <div class="mt-xl rounded-lg bg-surface shadow-card">
+          <fieldset class="mt-xl grid grid-cols-2 gap-sm border-0 p-0" aria-label="읽어주기 / 암기 테스트">
+            <label class="radio-tap-target flex cursor-pointer items-center gap-sm rounded-lg bg-surface px-sm shadow-card">
+              <input type="radio" name="practiceMode" value="read" class="radio-input shrink-0" checked>
+              <strong class="text-[15px] font-semibold text-ink">읽어주기</strong>
+            </label>
+            <label class="radio-tap-target flex cursor-pointer items-center gap-sm rounded-lg bg-surface px-sm shadow-card">
+              <input type="radio" name="practiceMode" value="quiz" class="radio-input shrink-0">
+              <strong class="text-[15px] font-semibold text-ink">암기 테스트</strong>
+            </label>
+          </fieldset>
+
+          <div id="readingSettings" class="mt-xl rounded-lg bg-surface shadow-card">
             <section>
               <button id="voiceSettingsToggle" type="button" class="flex min-h-xxl w-full items-center gap-md rounded-lg bg-transparent px-5 py-md text-left" aria-expanded="false" aria-controls="voiceSettingsPanel">
                 <span class="min-w-0 flex-1">

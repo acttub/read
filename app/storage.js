@@ -6,6 +6,7 @@ const STORAGE_KEYS = {
   silenceSec: "read.silenceSec",
   engine: "read.engine",
   voiceId: "read.voiceId",
+  mode: "read.mode",
 };
 
 const ADVANCE_MODES = new Set(["tap", "silence", "cue"]);
@@ -19,6 +20,7 @@ const VOICE_IDS = new Set([
   "SAz9YHcvj6GT2YYXdXww",
 ]);
 const DEFAULT_VOICE_ID = "SAz9YHcvj6GT2YYXdXww";
+const MODES = new Set(["read", "quiz"]);
 
 export function saveScript(script) {
   sessionStorage.setItem(STORAGE_KEYS.script, script);
@@ -84,4 +86,16 @@ export function readEngine() {
 export function readVoiceId() {
   const stored = sessionStorage.getItem(STORAGE_KEYS.voiceId);
   return VOICE_IDS.has(stored) ? stored : DEFAULT_VOICE_ID;
+}
+
+export function saveMode(mode) {
+  sessionStorage.setItem(
+    STORAGE_KEYS.mode,
+    MODES.has(mode) ? mode : "read",
+  );
+}
+
+export function readMode() {
+  const stored = sessionStorage.getItem(STORAGE_KEYS.mode);
+  return MODES.has(stored) ? stored : "read";
 }

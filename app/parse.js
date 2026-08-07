@@ -134,6 +134,54 @@ export function parseScript(text) {
   return { turns: selectedTurns, roles };
 }
 
+export function parseScriptWithRoles(text, roleNames) {
+  const names = [...new Set(
+    roleNames.map((name) => String(name).trim()).filter(Boolean),
+  )];
+  const matchOrder = [...names].sort((left, right) => right.length - left.length);
+  const turns = [];
+  let current = null;
+
+  function finishCurrent() {
+    if (!current) return;
+    const turn = makeTurn(current.role, current.text);
+    if (turn) turns.push(turn);
+    current = null;
+  }
+
+  for (const rawLine of String(text ?? "").split("\n")) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    // 이름 뒤에 글자가 바로 붙으면 배역 줄이 아니라 대사 줄이다 — 배역이 "영희"일 때
+    // "영희는 아직 안 왔어"를 잘라내면 대사에서 "영희"가 사라진다.
+    const role = matchOrder.find((name) => {
+      if (!line.startsWith(name)) return false;
+      const rest = line.slice(name.length);
+      return rest === "" || /^[\s:：]/.test(rest);
+    });
+    if (role) {
+      finishCurrent();
+      current = {
+        role,
+        text: line.slice(role.length).replace(/^[\s:：]+/, ""),
+      };
+      continue;
+    }
+
+    if (current) {
+      current.text = current.text ? `${current.text}\n${line}` : line;
+    }
+  }
+  finishCurrent();
+
+  const roles = [];
+  for (const turn of turns) {
+    if (!roles.includes(turn.role)) roles.push(turn.role);
+  }
+  return { turns, roles };
+}
+
 export function lastWord(text) {
   const cleaned = text.replace(/[.,!?…"'）)]+$/g, "").trim();
   const parts = cleaned.split(/\s+/).filter(Boolean);

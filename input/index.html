@@ -70,6 +70,16 @@
             aria-labelledby="pageTitle"
             aria-describedby="scriptFileStatus scriptError"
           ></textarea>
+          <div id="manualRolesField" class="mt-md" hidden>
+            <label for="manualRolesInput" class="mb-xs flex min-h-11 items-center text-[14px] font-semibold text-ink-sub">배역 이름을 쉼표로 알려주세요</label>
+            <input
+              id="manualRolesInput"
+              class="min-h-11 w-full rounded-lg border-0 bg-surface px-md text-ink shadow-card focus:outline-[1.5px] focus:outline-primary focus:outline-offset-2"
+              type="text"
+              autocomplete="off"
+              aria-describedby="scriptError"
+            >
+          </div>
           <p id="scriptError" class="mb-0 mt-2 text-[13px] font-medium text-danger" aria-live="polite">대본을 붙여넣어 주세요.</p>
         </main>
 

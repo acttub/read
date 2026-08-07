@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseScript } from "../app/parse.js";
+import { parseScript, parseScriptWithRoles } from "../app/parse.js";
 
 test("콜론 형식을 감지한다", () => {
   const result = parseScript([
@@ -228,4 +228,40 @@ test("괄호로 시작하는 대사를 지문으로 표시한다", () => {
 
   assert.equal(result.turns[0].isDirection, true);
   assert.equal(result.turns[1].isDirection, false);
+});
+
+test("직접 받은 배역 이름으로 여러 줄 대사를 다시 파싱한다", () => {
+  const result = parseScriptWithRoles([
+    "건우 왜 아무 말도 안 했어.",
+    "정말 몰랐던 거야?",
+    "서연：말하면 네가 떠날 것 같았어.",
+    "건우\t그건 네가 정할 일이 아니야.",
+  ].join("\n"), ["건우", "서연"]);
+
+  assert.deepEqual(result.roles, ["건우", "서연"]);
+  assert.deepEqual(result.turns.map(({ role, text }) => [role, text]), [
+    ["건우", "왜 아무 말도 안 했어.\n정말 몰랐던 거야?"],
+    ["서연", "말하면 네가 떠날 것 같았어."],
+    ["건우", "그건 네가 정할 일이 아니야."],
+  ]);
+});
+
+test("직접 받은 이름이 실제 대사와 연결되지 않으면 배역을 만들지 않는다", () => {
+  const result = parseScriptWithRoles("장면 설명만 있는 대본", ["건우"]);
+  assert.deepEqual(result, { turns: [], roles: [] });
+});
+
+test("배역 이름으로 시작할 뿐인 대사 줄을 배역 줄로 자르지 않는다", () => {
+  const result = parseScriptWithRoles([
+    "건우: 서연이 어디 갔어?",
+    "서연: 나 여기 있어.",
+    "건우: 서연은 아직 안 왔다고 들었는데.",
+    "서연이가 그렇게 말했어?",
+  ].join("\n"), ["건우", "서연"]);
+
+  assert.deepEqual(result.turns.map(({ role, text }) => [role, text]), [
+    ["건우", "서연이 어디 갔어?"],
+    ["서연", "나 여기 있어."],
+    ["건우", "서연은 아직 안 왔다고 들었는데.\n서연이가 그렇게 말했어?"],
+  ]);
 });
