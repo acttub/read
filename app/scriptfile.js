@@ -266,7 +266,7 @@ async function collectDecompressedBytes(stream, expectedSize) {
       if (totalSize > MAX_EXTRACTED_XML_BYTES) {
         throw new ScriptFileError(
           "expanded_file_too_large",
-          "압축을 푼 문서가 너무 커서 읽을 수 없습니다.",
+          "파일이 너무 커서 열지 못했어요. 텍스트를 복사해 붙여넣어 주세요.",
         );
       }
       chunks.push(value);
@@ -297,7 +297,7 @@ export async function decompressZipEntry(
   if (entry.uncompressedSize > MAX_EXTRACTED_XML_BYTES) {
     throw new ScriptFileError(
       "expanded_file_too_large",
-      "압축을 푼 문서가 너무 커서 읽을 수 없습니다.",
+      "파일이 너무 커서 열지 못했어요. 텍스트를 복사해 붙여넣어 주세요.",
     );
   }
 

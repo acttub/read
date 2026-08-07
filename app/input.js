@@ -8,10 +8,17 @@ trackEvent("landing_view");
 const scriptInput = document.getElementById("scriptInput");
 const continueButton = document.getElementById("continueButton");
 const scriptError = document.getElementById("scriptError");
+const emptyState = document.getElementById("emptyState");
+const inputState = document.getElementById("inputState");
+const pasteButton = document.getElementById("pasteButton");
+const writeButton = document.getElementById("writeButton");
+const resetButton = document.getElementById("resetButton");
+const pasteGuidance = document.getElementById("pasteGuidance");
 const scriptFileInput = document.getElementById("scriptFileInput");
 const scriptFileButton = document.getElementById("scriptFileButton");
 const scriptFileButtonText = document.getElementById("scriptFileButtonText");
 const scriptFileStatus = document.getElementById("scriptFileStatus");
+const roleChips = document.getElementById("roleChips");
 const manualRolesField = document.getElementById("manualRolesField");
 const manualRolesInput = document.getElementById("manualRolesInput");
 
@@ -19,10 +26,31 @@ const manualRolesInput = document.getElementById("manualRolesInput");
 // 알리면 안 된다. 사용자가 한 번이라도 입력을 건드린 뒤에만 형식 오류를 보여준다.
 let hasInteracted = false;
 
+function showPasteGuidance(message = "") {
+  pasteGuidance.textContent = message;
+  pasteGuidance.hidden = !message;
+}
+
+function renderRoleChips(result) {
+  roleChips.replaceChildren();
+
+  for (const role of result.roles) {
+    const lineCount = result.turns.filter((turn) => turn.role === role).length;
+    const chip = document.createElement("span");
+    chip.className =
+      "inline-flex min-h-11 items-center rounded-pill bg-primary-soft px-md text-body-sm font-semibold text-primary-strong";
+    chip.textContent = `${role} · ${lineCount}줄`;
+    roleChips.append(chip);
+  }
+
+  roleChips.hidden = result.roles.length === 0;
+}
+
 function validateScript() {
   const script = scriptInput.value;
 
   if (!script.trim()) {
+    renderRoleChips({ roles: [], turns: [] });
     manualRolesField.hidden = true;
     continueButton.disabled = true;
     scriptError.textContent = hasInteracted ? "대본을 붙여넣어 주세요." : "";
@@ -38,11 +66,12 @@ function validateScript() {
   const result = automaticResult.roles.length > 0
     ? automaticResult
     : parseScriptWithRoles(script, manualRoleNames);
+  renderRoleChips(result);
 
   if (result.roles.length === 0) {
     continueButton.disabled = true;
     scriptError.textContent =
-      "배역명과 대사가 구분되어 있는지 확인해 주세요.";
+      "배역 이름과 대사가 구분되어 있는지 확인해 주세요.";
     return false;
   }
 
@@ -77,7 +106,43 @@ function showFileStatus(message, isError = false) {
 function setFileReading(isReading) {
   scriptFileInput.disabled = isReading;
   scriptFileButton.disabled = isReading;
-  scriptFileButtonText.textContent = isReading ? "읽는 중…" : "대본 파일 열기";
+  scriptFileButtonText.textContent = isReading ? "읽는 중…" : "파일에서 열기";
+}
+
+function resizeScriptInput() {
+  scriptInput.style.height = "auto";
+  const maxHeight = Number.parseFloat(getComputedStyle(scriptInput).maxHeight);
+  const nextHeight = Number.isFinite(maxHeight)
+    ? Math.min(scriptInput.scrollHeight, maxHeight)
+    : scriptInput.scrollHeight;
+  scriptInput.style.height = `${nextHeight}px`;
+  scriptInput.style.overflowY =
+    scriptInput.scrollHeight > nextHeight ? "auto" : "hidden";
+}
+
+function showInputState({ focus = false, guidance = "" } = {}) {
+  emptyState.hidden = true;
+  inputState.hidden = false;
+  continueButton.hidden = false;
+  showPasteGuidance(guidance);
+  resizeScriptInput();
+  validateScript();
+
+  if (focus) {
+    requestAnimationFrame(() => scriptInput.focus());
+  }
+}
+
+function showEmptyState() {
+  scriptInput.value = "";
+  manualRolesInput.value = "";
+  hasInteracted = false;
+  showPasteGuidance();
+  showFileStatus("");
+  validateScript();
+  inputState.hidden = true;
+  emptyState.hidden = false;
+  continueButton.hidden = true;
 }
 
 scriptFileButton.addEventListener("click", () => {
@@ -100,7 +165,7 @@ scriptFileInput.addEventListener("change", async () => {
 
     scriptInput.value = result.text;
     hasInteracted = true;
-    validateScript();
+    showInputState();
     showFileStatus(result.warning);
   } catch (error) {
     const message =
@@ -114,8 +179,43 @@ scriptFileInput.addEventListener("change", async () => {
   }
 });
 
+pasteButton.addEventListener("click", async () => {
+  let clipboardText = "";
+  showFileStatus("");
+
+  try {
+    const clipboard = navigator.clipboard;
+    if (!clipboard || typeof clipboard.readText !== "function") {
+      throw new TypeError("Clipboard API unavailable");
+    }
+    clipboardText = await clipboard.readText();
+  } catch {
+    clipboardText = "";
+  }
+
+  const hasClipboardText =
+    typeof clipboardText === "string" && clipboardText.trim().length > 0;
+  scriptInput.value = hasClipboardText ? clipboardText : "";
+  hasInteracted = hasClipboardText;
+  showInputState({
+    focus: !hasClipboardText,
+    guidance: hasClipboardText ? "" : "여기에 붙여넣어 주세요.",
+  });
+});
+
+writeButton.addEventListener("click", () => {
+  showFileStatus("");
+  scriptInput.value = "";
+  hasInteracted = false;
+  showInputState({ focus: true });
+});
+
+resetButton.addEventListener("click", showEmptyState);
+
 scriptInput.addEventListener("input", () => {
   hasInteracted = true;
+  showPasteGuidance();
+  resizeScriptInput();
   validateScript();
 });
 
@@ -146,4 +246,6 @@ continueButton.addEventListener("click", () => {
   window.location.href = "/char";
 });
 
-validateScript();
+window.addEventListener("resize", resizeScriptInput);
+
+showEmptyState();
