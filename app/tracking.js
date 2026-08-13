@@ -1,7 +1,38 @@
 const CORE_TRACK =
   "https://script.google.com/macros/s/AKfycbxmvQWyu-kslgIbVshJolG2KXV_omgT_vcUpmwJljvvYE8MkwUug-WGEhZmWUdU2ErK/exec";
 const TRACKED_EVENTS_KEY = "read.trackedEvents";
+const AD_ID_KEY = "read_ad_id";
 const trackedEvents = new Set();
+
+(function captureInboundUpstream() {
+  if (typeof location === "undefined") return;
+  const params = new URLSearchParams(location.search);
+  const adId = ["utm_medium", "utm_campaign", "utm_content"]
+    .map((key) => (params.get(key) || "").trim())
+    .filter(Boolean)
+    .join("-");
+  if (adId) {
+    try {
+      sessionStorage.setItem(AD_ID_KEY, adId);
+    } catch {
+      // 저장 안 돼도 흐름은 계속한다.
+    }
+  }
+})();
+
+export function inboundAdId() {
+  try {
+    return sessionStorage.getItem(AD_ID_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+export function withInboundAdId(href) {
+  const adId = inboundAdId();
+  if (!adId) return href;
+  return `${href}${href.includes("?") ? "&" : "?"}utm_id=${encodeURIComponent(adId)}`;
+}
 
 function isProductionHost() {
   return /(^|\.)acttub\.com$/.test(location.hostname);

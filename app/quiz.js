@@ -1,7 +1,7 @@
 import { compare, normalize } from "./match.js";
 import { parseScript } from "./parse.js";
 import { readMyRole, readScript } from "./storage.js";
-import { trackMetric } from "./tracking.js";
+import { trackMetric, withInboundAdId } from "./tracking.js";
 
 const script = readScript();
 const myRole = readMyRole();
@@ -47,6 +47,8 @@ function initializeQuiz() {
   const overrideButton = document.getElementById("overrideButton");
   const hintButton = document.getElementById("hintButton");
   const originalButton = document.getElementById("originalButton");
+  const coreLink = document.getElementById("coreLink");
+  coreLink.href = withInboundAdId(coreLink.getAttribute("href"));
   const actionButtons = [
     speakButton,
     silentRecallButton,
@@ -623,7 +625,7 @@ function initializeQuiz() {
     reviewTurnIndex = index;
     renderTurn();
   });
-  document.getElementById("coreLink").addEventListener("click", () => {
+  coreLink.addEventListener("click", () => {
     trackMetric("quiz_core_click");
   });
   document.getElementById("exitButton").addEventListener("click", () => {

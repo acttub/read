@@ -68,6 +68,7 @@ beforeEach(() => {
   setGlobal("location", {
     hostname: "read.acttub.com",
     origin: "https://read.acttub.com",
+    search: "",
   });
   setGlobal("fetch", async () => new Response());
   setGlobal("sessionStorage", makeSessionStorage());
@@ -227,4 +228,33 @@ test("코어 클릭은 read 채널만 남기고 사용자 입력을 싣지 않�
   assert.equal(payload.from, "read");
   assert.equal(payload.src, "");
   assert.equal(payload.ref, "https://read.acttub.com");
+});
+
+test("인바운드 광고 식별자를 저장해 코어 링크의 utm_id로 넘긴다", async () => {
+  setGlobal("location", {
+    hostname: "read.acttub.com",
+    origin: "https://read.acttub.com",
+    search:
+      "?utm_source=instagram&utm_medium=paid&utm_campaign=actors&utm_content=carousel%2001",
+  });
+  const tracking = await importTrackingForPage("quiz-ad-id");
+  const coreHref =
+    "https://acttub.com/?utm_source=read&utm_medium=subproject&utm_campaign=read_quiz";
+
+  assert.equal(
+    sessionStorage.getItem("read_ad_id"),
+    "paid-actors-carousel 01",
+  );
+  assert.equal(
+    tracking.withInboundAdId(coreHref),
+    `${coreHref}&utm_id=paid-actors-carousel%2001`,
+  );
+});
+
+test("인바운드 광고 식별자가 없으면 코어 링크는 그대로 둔다", async () => {
+  const tracking = await importTrackingForPage("quiz-no-ad-id");
+  const coreHref =
+    "https://acttub.com/?utm_source=read&utm_medium=subproject&utm_campaign=read_quiz";
+
+  assert.equal(tracking.withInboundAdId(coreHref), coreHref);
 });
