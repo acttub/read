@@ -3,6 +3,10 @@ import { parseScript } from "./parse.js";
 import { readMyRole, readScript } from "./storage.js";
 import { trackMetric, withInboundAdId } from "./tracking.js";
 
+// 괄호를 지우고도 말이 남으면 대사다 — parse.js의 startsWith("(") 오분류를 quiz에서만 바로잡는다
+const isEffectiveDirection = (turn) =>
+  turn.isDirection && normalize(turn.text) === "";
+
 const script = readScript();
 const myRole = readMyRole();
 
@@ -30,6 +34,10 @@ function initializeQuiz() {
   const completionState = document.getElementById("completionState");
   const reviewSection = document.getElementById("reviewSection");
   const reviewList = document.getElementById("reviewList");
+  const progressBar = document.getElementById("progressBar");
+  const sceneLabel = document.getElementById("sceneLabel");
+  const pastTurns = document.getElementById("pastTurns");
+  const futureMarker = document.getElementById("futureMarker");
   const lineCard = document.getElementById("lineCard");
   const roleName = document.getElementById("roleName");
   const lineDisplay = document.getElementById("lineDisplay");
@@ -144,7 +152,7 @@ function initializeQuiz() {
     if (
       phase === "ready" &&
       currentTurn()?.role === myRole &&
-      !currentTurn()?.isDirection
+      !isEffectiveDirection(currentTurn())
     ) {
       setOnlyActions(
         state.voiceMode ? speakButton : silentRecallButton,
@@ -159,38 +167,48 @@ function initializeQuiz() {
     state.voiceMode = enabled;
     phase = phase === "listening" ? "ready" : phase;
     speakButton.textContent = "말하기";
+    speakButton.classList.remove("animate-pulse");
     setNotice(message);
     syncModeControls();
   }
 
-  function maskedText(text, revealedWordCount) {
-    const words = text.trim().split(/\s+/).filter(Boolean);
-    if (revealedWordCount <= 0) {
-      const characterCount = [...text].filter((character) => !/\s/.test(character)).length;
-      return "•".repeat(Math.min(characterCount, 24));
-    }
-
-    let maskBudget = 24;
-    return words.map((word, index) => {
-      if (index < revealedWordCount) return word;
-      const size = Math.min([...word].length, maskBudget);
-      maskBudget -= size;
-      return "•".repeat(size);
-    }).filter(Boolean).join(" ");
+  function spokenWords(text) {
+    return normalize(text).split(/\s+/).filter(Boolean);
   }
 
-  // data-masked는 CSS만 쓴다 — 가려진 점은 넓은 화면에서 한 줄로 퍼지면
-  // 구분선처럼 보여서, 그때만 글줄 폭을 좁혀 접는다(src/input.css).
-  function setLine(text, { masked = false } = {}) {
-    lineDisplay.textContent = text;
-    lineDisplay.toggleAttribute("data-masked", masked);
+  function setLine(text) {
+    lineDisplay.removeAttribute("aria-label");
+    lineDisplay.replaceChildren(document.createTextNode(text));
   }
 
   function renderMaskedLine(turn) {
-    const text = maskedText(turn.text, state.hintWords.get(state.index) || 0);
-    // 힌트로 어절이 전부 드러나면 더 이상 마스크가 아니다. 그때도 data-masked를
-    // 남기면 데스크톱에서 드러난 원문이 좁은 글줄 폭(14em)에 묶여 어색하게 접힌다.
-    setLine(text, { masked: text.includes("•") });
+    const words = spokenWords(turn.text);
+    const revealedWordCount = state.hintWords.get(state.index) || 0;
+    const veil = document.createElement("span");
+    veil.className = "quiz-word-veil";
+
+    for (const [index, word] of words.entries()) {
+      if (index < revealedWordCount) {
+        const hint = document.createElement("span");
+        hint.className = "quiz-word-hint";
+        hint.textContent = word;
+        veil.append(hint);
+        continue;
+      }
+
+      const mask = document.createElement("span");
+      mask.className = "quiz-word-mask";
+      mask.style.setProperty("--quiz-mask-characters", String([...word].length));
+      mask.setAttribute("aria-hidden", "true");
+      veil.append(mask);
+    }
+
+    lineDisplay.replaceChildren(veil);
+    const revealedWords = words.slice(0, revealedWordCount).join(" ");
+    lineDisplay.setAttribute(
+      "aria-label",
+      revealedWords ? `가려진 대사. 힌트: ${revealedWords}` : "가려진 대사",
+    );
   }
 
   function renderDifferentWords(segments) {
@@ -199,7 +217,7 @@ function initializeQuiz() {
       if (segment.matched) continue;
       const word = document.createElement("span");
       word.className =
-        "rounded-md bg-primary-soft px-sm py-xs font-script text-body-md font-semibold text-primary-strong";
+        "rounded-md border border-line bg-neutral px-sm py-xs font-script text-body-md font-semibold text-ink-sub";
       word.textContent = segment.text;
       differentWords.append(word);
     }
@@ -284,7 +302,7 @@ function initializeQuiz() {
       return different < selectedDifferent ? result : selected;
     });
     phase = "failed";
-    setLine("");
+    renderMaskedLine(turn);
     renderDifferentWords(closest.segments);
     setOnlyActions(retryButton, overrideButton, originalButton);
   }
@@ -316,7 +334,8 @@ function initializeQuiz() {
     setNotice("");
     setOnlyActions(speakButton);
     speakButton.disabled = true;
-    speakButton.textContent = "인식 중";
+    speakButton.textContent = "듣는 중…";
+    speakButton.classList.add("animate-pulse");
     const requestVersion = ++micRequestVersion;
     const activeTurnVersion = turnVersion;
 
@@ -387,6 +406,7 @@ function initializeQuiz() {
       clearRecognitionWatchdog();
       releaseMic();
       speakButton.textContent = "말하기";
+      speakButton.classList.remove("animate-pulse");
     }
 
     instance.onstart = markActivity;
@@ -473,6 +493,63 @@ function initializeQuiz() {
     }
   }
 
+  function updateProgress(index = state.index) {
+    const fraction = turns.length === 0
+      ? 0
+      : Math.min(Math.max(index / turns.length, 0), 1);
+    progressBar.style.width = `${fraction * 100}%`;
+  }
+
+  function makePastTurn(turn) {
+    const item = document.createElement("div");
+    item.className = "quiz-turn quiz-turn-past";
+    const direction = isEffectiveDirection(turn);
+    item.classList.toggle("quiz-turn-direction", direction);
+    item.classList.toggle("quiz-turn-me", turn.role === myRole && !direction);
+
+    if (!direction) {
+      const name = document.createElement("p");
+      name.className = "quiz-turn-role";
+      name.textContent = turn.role;
+      item.append(name);
+    }
+
+    const text = document.createElement("p");
+    text.className = "quiz-turn-text";
+    text.textContent = turn.text;
+    item.append(text);
+    return item;
+  }
+
+  function renderPastTurns() {
+    // 보통은 한 턴 전진이라 그 하나만 붙인다 — 긴 대본에서 매 턴 전체를 다시
+    // 그리면 O(N²)이다. 전체 재구성은 재연습으로 뒤로 점프했을 때만.
+    const rendered = pastTurns.childElementCount;
+    if (state.index === rendered) return;
+    if (state.index === rendered + 1) {
+      pastTurns.append(makePastTurn(turns[state.index - 1]));
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    for (let index = 0; index < state.index; index += 1) {
+      fragment.append(makePastTurn(turns[index]));
+    }
+    pastTurns.replaceChildren(fragment);
+  }
+
+  function scrollCurrentTurnIntoView() {
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    window.requestAnimationFrame(() => {
+      if (lineCard.hidden || quizStage.hidden) return;
+      lineCard.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "end",
+      });
+    });
+  }
+
   function renderTurn() {
     stopRecognition();
     clearTurnTimers();
@@ -484,6 +561,7 @@ function initializeQuiz() {
     emptyState.hidden = true;
     modeControls.hidden = false;
     syncModeControls();
+    updateProgress();
 
     if (state.index >= turns.length) {
       showCompletion();
@@ -491,22 +569,26 @@ function initializeQuiz() {
     }
 
     const turn = currentTurn();
-    lineCard.classList.toggle("bg-surface-sub", turn.isDirection);
-    lineCard.classList.toggle("bg-surface", !turn.isDirection);
-    roleName.hidden = turn.isDirection;
+    const direction = isEffectiveDirection(turn);
+    renderPastTurns();
+    sceneLabel.textContent = `내 배역 — ${myRole}`;
+    futureMarker.hidden = state.index >= turns.length - 1;
+    lineCard.classList.toggle("quiz-turn-direction", direction);
+    lineCard.classList.toggle(
+      "quiz-turn-me",
+      turn.role === myRole && !direction,
+    );
+    roleName.hidden = direction;
     roleName.textContent = turn.role;
+    scrollCurrentTurnIntoView();
 
-    if (turn.isDirection) {
+    if (direction) {
       setLine(turn.text);
-      lineDisplay.className =
-        "m-0 min-h-[3.5rem] font-script text-body-lg font-medium leading-[1.6] text-ink-sub";
       setOnlyActions();
       directionTimer = window.setTimeout(advanceTurn, 700);
       return;
     }
 
-    lineDisplay.className =
-      "m-0 min-h-[3.5rem] font-script text-[22px] font-semibold leading-[1.5] text-ink";
     if (turn.role !== myRole) {
       setLine(turn.text);
       setOnlyActions(nextButton);
@@ -524,6 +606,7 @@ function initializeQuiz() {
   function showCompletion() {
     stopRecognition();
     clearTurnTimers();
+    updateProgress(turns.length);
     quizStage.hidden = true;
     emptyState.hidden = true;
     completionState.hidden = false;
@@ -536,13 +619,18 @@ function initializeQuiz() {
     }
 
     const revealedIndexes = [...state.status]
-      .filter(([, status]) => status === "revealed")
+      .filter(([index, status]) =>
+        status === "revealed" && !isEffectiveDirection(turns[index])
+      )
       .map(([index]) => index);
     reviewList.replaceChildren();
     for (const index of revealedIndexes) {
       const turn = turns[index];
-      const item = document.createElement("article");
-      item.className = "rounded-lg bg-surface p-md shadow-card";
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className =
+        "w-full rounded-lg bg-surface p-md text-left shadow-card active:bg-surface-sub";
+      item.dataset.reviewIndex = String(index);
       const name = document.createElement("p");
       name.className = "m-0 text-label text-primary-strong";
       name.textContent = turn.role;
@@ -551,12 +639,9 @@ function initializeQuiz() {
       const text = document.createElement("p");
       text.className = "m-0 min-w-0 flex-1 font-script text-body-md text-ink";
       text.textContent = turn.text;
-      const retry = document.createElement("button");
-      retry.type = "button";
-      retry.className =
-        "shrink-0 rounded-md bg-primary-soft px-sm text-[14px] font-semibold text-primary-strong active:bg-primary-soft-hover";
+      const retry = document.createElement("span");
+      retry.className = "shrink-0 text-[14px] font-semibold text-primary-strong";
       retry.textContent = "다시";
-      retry.dataset.reviewIndex = String(index);
       row.append(text, retry);
       item.append(name, row);
       reviewList.append(item);
@@ -567,6 +652,7 @@ function initializeQuiz() {
   function showNoDialogue() {
     stopRecognition();
     clearTurnTimers();
+    updateProgress(0);
     quizStage.hidden = true;
     completionState.hidden = true;
     emptyState.hidden = false;
@@ -589,7 +675,7 @@ function initializeQuiz() {
   hintButton.addEventListener("click", () => {
     const turn = currentTurn();
     if (!turn) return;
-    const wordCount = turn.text.trim().split(/\s+/).filter(Boolean).length;
+    const wordCount = spokenWords(turn.text).length;
     const nextHint = Math.min(
       (state.hintWords.get(state.index) || 0) + 1,
       wordCount,
@@ -602,7 +688,10 @@ function initializeQuiz() {
   });
   nextButton.addEventListener("click", () => {
     const turn = currentTurn();
-    if (turn?.role === myRole && !turn.isDirection) markPassed(state.index);
+    if (
+      turn?.role === myRole &&
+      !isEffectiveDirection(turn)
+    ) markPassed(state.index);
     advanceTurn();
   });
   retryButton.addEventListener("click", () => {
@@ -650,7 +739,7 @@ function initializeQuiz() {
   }
 
   const hasMyDialogue = turns.some(
-    (turn) => turn.role === myRole && !turn.isDirection,
+    (turn) => turn.role === myRole && !isEffectiveDirection(turn),
   );
   if (!hasMyDialogue) showNoDialogue();
   else renderTurn();

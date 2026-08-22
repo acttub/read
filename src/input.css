@@ -28,6 +28,106 @@
   --font-script: "Apple SD Gothic Neo", "Noto Sans KR", -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+/* ── /quiz · 화면이 곧 대본인 스크롤 문서 ───────────────────────────── */
+#progressBar {
+  width: 0;
+  border-radius: 0 2px 2px 0;
+  transition: width 180ms ease-out;
+}
+
+#quizRoot {
+  min-height: calc(var(--app-min-h) - 3px);
+}
+
+#quizMain {
+  scroll-padding-bottom: calc(var(--spacing-xxl) * 2);
+}
+
+.quiz-turn {
+  margin-bottom: 22px;
+}
+
+.quiz-turn-role {
+  margin: 0 0 5px;
+  color: var(--color-ink-tertiary);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.quiz-turn-text {
+  margin: 0;
+  color: var(--color-ink-sub);
+  font-family: var(--font-script);
+  font-size: 18px;
+  line-height: 1.65;
+  word-break: keep-all;
+}
+
+.quiz-turn-past {
+  opacity: 0.62;
+}
+
+.quiz-turn-me .quiz-turn-role {
+  color: var(--color-primary-strong);
+}
+
+.quiz-turn-current {
+  position: relative;
+  padding-left: 14px;
+  scroll-margin-block-end: calc(var(--spacing-xxl) * 2);
+}
+
+.quiz-turn-current::before {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--color-primary);
+  content: "";
+}
+
+.quiz-turn-current .quiz-turn-text {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.quiz-turn-direction .quiz-turn-text {
+  color: var(--color-ink-sub);
+  font-size: var(--text-body-lg);
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+.quiz-word-veil {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.quiz-word-mask {
+  display: inline-block;
+  flex: 0 0 auto;
+  /* 공백 없는 긴 외침("아아아…!")이 글줄보다 넓어지면 가로 스크롤이 생긴다 —
+     블록은 못 접으므로 폭만 글줄에 맞춰 자른다. 글자 수 단서는 이미 근사값이다. */
+  max-width: 100%;
+  width: calc(var(--quiz-mask-characters) * 0.9em + 20px);
+  height: 26px;
+  border: 1px solid var(--color-line);
+  border-radius: 7px;
+  background: var(--color-neutral);
+}
+
+.quiz-word-hint {
+  align-self: center;
+  color: var(--color-ink);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 26px;
+}
+
 /* ── 넓은 화면에서 폰 레이아웃이 새는 것을 막는다 ───────────────────────
    화면 4개가 전부 `header / main.flex-1 / footer` 골격이다. 폰에서는 이게 맞다 —
    콘텐츠는 위, 조작은 엄지가 닿는 화면 바닥. 그런데 뷰포트가 커지면 `flex-1`이
@@ -90,27 +190,14 @@
     padding-top: var(--spacing-xl);
   }
 
-  /* ④ 대사 카드는 이 두 화면의 주인공이다. 680px 카드 왼쪽 구석에 22px 한 줄만
-     찍히면 카드가 비어 보인다. 글자와 안쪽 여백을 한 단 키운다 —
-     크기도 지어내지 않고 토큰에서 가져온다(h1 30px · spacing-xl 40px).
-
-     `.font-semibold`로 좁힌 이유: 지문일 때 JS가 className을 text-body-lg /
-     font-medium으로 통째로 갈아끼운다. 지문까지 같이 커지면 대사와 구분이 사라진다.
-
-     ⚠️ 좌우를 40이 아니라 24로 둔 이유가 있다. /quiz가 대사를 가릴 때 쓰는 마스크는
-     `•` 24개까지인데, 30px에서 그게 정확히 600px다. 좌우도 40이면 글줄이 600px가 되어
-     마지막 점 하나가 다음 줄로 떨어진다 — 고아 점 하나가 카드에서 제일 먼저 눈에 띈다. */
-  #lineCard,
+  /* ④ /prac 대사 카드는 680px 왼쪽 구석에 한 줄만 찍히지 않도록 글자와
+     안쪽 여백을 한 단 키운다. /quiz는 카드가 아닌 대본 문서라 위 전용 규칙을 쓴다. */
   #currentLineCard {
     padding: var(--spacing-xl) var(--spacing-lg);
   }
 
   /* 지문(isDirection)은 font-normal·font-medium이라 여기 안 걸린다 — 대사만 키운다.
-     굵기 클래스로 좁히는 이유는 /prac이 턴마다 className을 통째로 갈아끼우기 때문이다.
-     font-bold는 배포된 /prac, font-semibold는 /quiz와 작업 중인 /prac이 쓴다.
-     ⚠️ /prac의 굵기가 바뀌면 여기도 같이 봐야 한다 — 안 그러면 카드만 커지고
-     대사는 22px로 남는다. */
-  #lineDisplay.font-semibold,
+     /prac의 굵기가 바뀌면 카드만 커지고 글자는 남지 않도록 여기도 같이 본다. */
   #currentLineText.font-semibold,
   #currentLineText.font-bold {
     font-size: var(--text-h1);
@@ -187,25 +274,12 @@
 }
 
 @media (min-width: 1024px) and (min-height: 700px) {
-  /* ── /quiz · /prac · 대사가 주인공이면 카드가 무대여야 한다 ──────────
-     지금은 카드가 대사 한 줄 높이라 화면 위쪽에 얇게 떠 있고 아래 절반이 빈다.
+  /* ── /prac · 대사가 주인공이면 카드가 무대여야 한다 ────────────────
+     카드가 대사 한 줄 높이라 화면 위쪽에 얇게 떠 있고 아래 절반이 비지 않게 한다.
      높이를 간격 토큰의 배수로 고정하고(카드 위치가 매 턴 고정된다) 그 안에서
      세로 가운데에 둔다. 헤더는 카드 위에 있으므로 줄 길이가 바뀌어도 안 움직인다. */
-  #lineCard,
   #currentLineCard {
     min-height: calc(var(--spacing-xxl) * 4);
     justify-content: center;
-  }
-
-  #lineCard {
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* 가려진 대사는 24점까지인데, 30px에서 그게 600px 한 줄이라 구분선으로 읽힌다.
-     폰에서는 두 줄로 접혀 "가려진 글"로 보이므로 넓은 화면에서도 접히게 한다.
-     em이라 점 크기가 바뀌어도 한 줄에 들어가는 점 수가 유지된다. */
-  #lineDisplay[data-masked] {
-    max-width: 14em;
   }
 }

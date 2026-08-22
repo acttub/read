@@ -23,23 +23,26 @@
     })();
     </script>
   </head>
-  <body class="m-0 bg-neutral font-sans text-ink">
-    <div class="tier-root bg-neutral">
-      <div class="tier-shell flex min-h-[var(--app-min-h)] flex-col pt-md">
+  <body class="m-0 bg-surface font-sans text-ink">
+    <div id="progressTrack" class="h-[3px] bg-line" aria-hidden="true">
+      <i id="progressBar" class="block h-full bg-primary"></i>
+    </div>
+    <div id="quizRoot" class="tier-root bg-surface">
+      <div id="quizShell" class="tier-shell flex h-[calc(var(--app-min-h)-3px)] flex-col pt-sm" style="--tier-sticky-bg: var(--color-surface)">
         <header>
           <div class="flex min-h-11 items-center justify-between gap-md">
             <button id="exitButton" type="button" class="inline-flex min-h-11 items-center gap-xs bg-transparent px-xs text-body-sm font-semibold text-ink-sub">
               <span aria-hidden="true">✕</span>
               <span>나가기</span>
             </button>
-            <div id="modeControls" class="flex items-center gap-xs" role="radiogroup" aria-label="음성 모드 / 무음 모드">
-              <label class="relative inline-flex min-h-11 cursor-pointer items-center rounded-pill px-sm text-[13px] font-semibold text-ink-sub has-checked:bg-primary-soft has-checked:text-primary-strong">
+            <div id="modeControls" class="flex items-center gap-xs rounded-pill bg-neutral p-[3px]" role="radiogroup" aria-label="암기 방식">
+              <label class="relative inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-pill px-sm text-[12px] font-semibold text-ink-tertiary has-checked:bg-surface has-checked:text-primary-strong has-checked:shadow-card">
                 <input id="voiceModeInput" class="absolute inset-0 m-0 h-full w-full cursor-pointer appearance-none opacity-0" type="radio" name="quizMode" value="voice">
-                <span>음성 모드</span>
+                <span>말하기</span>
               </label>
-              <label class="relative inline-flex min-h-11 cursor-pointer items-center rounded-pill px-sm text-[13px] font-semibold text-ink-sub has-checked:bg-primary-soft has-checked:text-primary-strong">
+              <label class="relative inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-pill px-sm text-[12px] font-semibold text-ink-tertiary has-checked:bg-surface has-checked:text-primary-strong has-checked:shadow-card">
                 <input id="silentModeInput" class="absolute inset-0 m-0 h-full w-full cursor-pointer appearance-none opacity-0" type="radio" name="quizMode" value="silent">
-                <span>무음 모드</span>
+                <span>무음</span>
               </label>
             </div>
           </div>
@@ -47,33 +50,38 @@
           <p id="modeNotice" class="mb-0 mt-sm text-[13px] font-medium text-ink-sub empty:hidden" aria-live="polite"></p>
         </header>
 
-        <main class="flex min-h-0 flex-1 flex-col pt-lg desktop:pt-xl">
+        <main id="quizMain" class="flex min-h-0 flex-1 flex-col overflow-y-auto pt-sm">
           <section id="emptyState" class="my-auto rounded-lg bg-surface p-5 shadow-card" hidden>
             <p class="m-0 text-h2">고른 배역에 대사가 없어요</p>
             <a href="/char" class="btn mt-lg inline-flex h-14 w-full items-center justify-center rounded-lg bg-primary-strong font-bold text-white active:bg-primary-deep">배역 고르기</a>
           </section>
 
-          <section id="quizStage" class="flex min-h-0 flex-1 flex-col">
-            <div id="lineCard" class="rounded-lg bg-surface p-5 shadow-card">
-              <p id="roleName" class="mb-sm mt-0 text-label text-primary-strong"></p>
-              <p id="lineDisplay" class="m-0 min-h-[3.5rem] font-script text-[22px] font-semibold leading-[1.5] text-ink" aria-live="polite"></p>
-              <div id="differentWords" class="mt-md flex flex-wrap gap-xs" hidden></div>
+          <section id="quizStage" class="pb-lg">
+            <p id="sceneLabel" class="mb-lg mt-0 text-[12px] font-semibold tracking-[0.06em] text-ink-tertiary"></p>
+            <div id="scriptTurns">
+              <div id="pastTurns"></div>
+              <div id="lineCard" class="quiz-turn quiz-turn-current">
+                <p id="roleName" class="quiz-turn-role"></p>
+                <p id="lineDisplay" class="quiz-turn-text" aria-live="polite"></p>
+                <div id="differentWords" class="mt-md flex flex-wrap gap-xs" hidden></div>
+              </div>
             </div>
+            <p id="futureMarker" class="m-0 pt-sm text-center text-[12px] text-line" aria-hidden="true">· · ·</p>
           </section>
 
-          <section id="completionState" class="my-auto" hidden>
+          <section id="completionState" class="my-auto py-lg" hidden>
             <section id="reviewSection" class="mb-xl" hidden>
               <h2 class="m-0 text-h2">아직 안 나온 줄</h2>
               <div id="reviewList" class="mt-md space-y-sm"></div>
             </section>
-            <div class="rounded-lg bg-surface p-5 shadow-card">
+            <div>
               <h1 class="m-0 text-h1">여기까지가 글자예요.</h1>
-              <a id="coreLink" href="https://acttub.com/?utm_source=read&amp;utm_medium=subproject&amp;utm_campaign=read_quiz" class="btn mt-lg inline-flex min-h-11 items-center text-body-lg font-semibold text-primary-strong underline underline-offset-4">이 인물이 왜 이 말을 하는지는 — acttub에서 질문으로 →</a>
+              <a id="coreLink" href="https://acttub.com/?utm_source=read&amp;utm_medium=subproject&amp;utm_campaign=read_quiz" class="btn mt-lg inline-flex h-14 w-full items-center justify-center rounded-lg bg-primary-strong px-md text-center text-body-lg font-bold text-white active:bg-primary-deep">이 인물이 왜 이 말을 하는지는 — acttub에서 질문으로 →</a>
             </div>
           </section>
         </main>
 
-        <footer id="actionArea" class="tier-sticky-bottom mt-auto pt-lg" hidden>
+        <footer id="actionArea" class="tier-sticky-bottom mt-auto pt-sm" hidden>
           <div class="wide-action grid gap-sm">
             <button id="speakButton" type="button" class="h-14 w-full rounded-lg bg-primary-strong font-bold text-white active:bg-primary-deep" hidden>말하기</button>
             <button id="silentRecallButton" type="button" class="h-14 w-full rounded-lg bg-primary-strong font-bold text-white active:bg-primary-deep" hidden>떠올렸어요</button>
@@ -82,8 +90,8 @@
             <button id="overrideButton" type="button" class="h-14 w-full rounded-lg bg-primary-soft font-bold text-primary-strong active:bg-primary-soft-hover" hidden>맞게 말했는데</button>
           </div>
           <div class="wide-action mt-sm grid grid-cols-2 gap-sm">
-            <button id="hintButton" type="button" class="h-12 w-full rounded-lg bg-surface font-semibold text-primary-strong shadow-card active:bg-primary-soft" hidden>힌트</button>
-            <button id="originalButton" type="button" class="h-12 w-full rounded-lg bg-surface font-semibold text-primary-strong shadow-card active:bg-primary-soft" hidden>원문 보기</button>
+            <button id="hintButton" type="button" class="h-12 w-full rounded-lg bg-neutral font-semibold text-ink-sub active:bg-primary-soft" hidden>힌트</button>
+            <button id="originalButton" type="button" class="h-12 w-full rounded-lg bg-neutral font-semibold text-ink-sub active:bg-primary-soft" hidden>원문 보기</button>
           </div>
         </footer>
       </div>
