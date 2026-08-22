@@ -3,6 +3,14 @@ import { parseScript } from "./parse.js";
 import { readMyRole, readScript } from "./storage.js";
 import { trackMetric, withInboundAdId } from "./tracking.js";
 
+const TRANSCRIBE_AUDIO_TYPES = new Set([
+  "audio/webm",
+  "audio/mp4",
+  "audio/mpeg",
+  "audio/wav",
+  "audio/ogg",
+]);
+
 // 괄호를 지우고도 말이 남으면 대사다 — parse.js의 startsWith("(") 오분류를 quiz에서만 바로잡는다
 const isEffectiveDirection = (turn) =>
   turn.isDirection && normalize(turn.text) === "";
@@ -21,12 +29,23 @@ function initializeQuiz() {
   const inAppBrowser = /Instagram|FBAN|FBAV|KAKAOTALK|Line\//i.test(
     navigator.userAgent,
   );
+  const SpeechRecognitionCtor =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
+  const hasMicrophoneAccess = Boolean(
+    navigator.mediaDevices?.getUserMedia,
+  );
+  const initialVoiceEngine = hasMicrophoneAccess && window.MediaRecorder
+    ? "server"
+    : hasMicrophoneAccess && SpeechRecognitionCtor
+    ? "browser"
+    : null;
   const state = {
     index: 0,
     status: new Map(),
     attempts: new Map(),
     hintWords: new Map(),
-    voiceMode: !inAppBrowser,
+    voiceMode: !inAppBrowser && initialVoiceEngine !== null,
+    voiceEngine: initialVoiceEngine,
   };
 
   const emptyState = document.getElementById("emptyState");
@@ -73,12 +92,17 @@ function initializeQuiz() {
   let recognitionWatchdog = null;
   let recognition = null;
   let micStream = null;
+  let recordingTimer = null;
+  let mediaRecorder = null;
+  let recordingChunks = [];
+  let transcriptionController = null;
   let micRequestVersion = 0;
   let turnVersion = 0;
   let reviewTurnIndex = null;
   let sessionActive = true;
   let voiceResultTracked = false;
   let voiceDeadTracked = false;
+  let voiceFallbackTracked = false;
   let finishTracked = false;
 
   trackMetric("quiz_start");
@@ -115,9 +139,41 @@ function initializeQuiz() {
     recognitionWatchdog = null;
   }
 
+  function clearRecordingTimer() {
+    if (!recordingTimer) return;
+    clearTimeout(recordingTimer);
+    recordingTimer = null;
+  }
+
+  function resetSpeakButton() {
+    speakButton.disabled = false;
+    speakButton.textContent = "말하기";
+    speakButton.classList.remove("animate-pulse");
+  }
+
   function stopRecognition() {
     micRequestVersion += 1;
     clearRecognitionWatchdog();
+    clearRecordingTimer();
+    if (transcriptionController) {
+      transcriptionController.abort();
+      transcriptionController = null;
+    }
+    if (mediaRecorder) {
+      const instance = mediaRecorder;
+      mediaRecorder = null;
+      instance.ondataavailable = null;
+      instance.onerror = null;
+      instance.onstop = null;
+      if (instance.state !== "inactive") {
+        try {
+          instance.stop();
+        } catch {
+          // 이미 멈추는 중인 녹음기는 더 중단할 것이 없다.
+        }
+      }
+    }
+    recordingChunks = [];
     if (recognition) {
       recognition.onstart = null;
       recognition.onaudiostart = null;
@@ -132,6 +188,7 @@ function initializeQuiz() {
       recognition = null;
     }
     releaseMic();
+    resetSpeakButton();
   }
 
   function currentTurn() {
@@ -148,6 +205,9 @@ function initializeQuiz() {
     voiceModeInput.checked = state.voiceMode;
     silentModeInput.checked = !state.voiceMode;
     voiceDisclosure.hidden = !state.voiceMode;
+    voiceDisclosure.textContent = state.voiceEngine === "server"
+      ? "말하기를 쓰면 말소리가 acttub 서버를 거쳐 OpenAI로 전송돼 글자로 바뀌어요. 바뀐 뒤 녹음은 바로 버려요."
+      : "말하기를 쓰면 말소리가 브라우저 제공사 서버로 전송돼요.";
 
     if (
       phase === "ready" &&
@@ -164,10 +224,14 @@ function initializeQuiz() {
 
   function setVoiceMode(enabled, message = "") {
     stopRecognition();
-    state.voiceMode = enabled;
-    phase = phase === "listening" ? "ready" : phase;
-    speakButton.textContent = "말하기";
-    speakButton.classList.remove("animate-pulse");
+    state.voiceMode = enabled && state.voiceEngine !== null;
+    if (["listening", "recording", "processing"].includes(phase)) {
+      phase = "ready";
+    }
+    if (enabled && state.voiceEngine === null && !message) {
+      message =
+        "이 브라우저에서는 말하기가 안 되네요. 떠올리고 확인하는 방식으로 이어갈게요.";
+    }
     setNotice(message);
     syncModeControls();
   }
@@ -307,15 +371,259 @@ function initializeQuiz() {
     setOnlyActions(retryButton, overrideButton, originalButton);
   }
 
-  async function startRecognition() {
+  function canUseBrowserRecognition() {
+    return Boolean(
+      SpeechRecognitionCtor && navigator.mediaDevices?.getUserMedia,
+    );
+  }
+
+  function showUnheard(message = "안 들렸어요, 다시 눌러주세요") {
+    const turn = currentTurn();
+    if (!turn) return;
+    resetSpeakButton();
+    phase = "ready";
+    showReadyMyTurn(turn);
+    setNotice(message);
+  }
+
+  function fallbackFromServer() {
+    if (canUseBrowserRecognition()) {
+      state.voiceEngine = "browser";
+      if (!voiceFallbackTracked) {
+        voiceFallbackTracked = true;
+        trackMetric("quiz_voice_fallback");
+      }
+      showUnheard(
+        "이 기기의 음성 인식으로 이어갈게요",
+      );
+      return;
+    }
+
+    state.voiceEngine = null;
+    setVoiceMode(
+      false,
+      "이 브라우저에서는 말하기가 안 되네요. 떠올리고 확인하는 방식으로 이어갈게요.",
+    );
+  }
+
+  async function transcribeRecording(
+    chunks,
+    recordedType,
+    requestVersion,
+    activeTurnVersion,
+  ) {
+    let audioBlob = new Blob(chunks, { type: recordedType });
+    chunks.length = 0;
+    if (audioBlob.size === 0) {
+      audioBlob = null;
+      showUnheard();
+      return;
+    }
+
+    const audioType = audioBlob.type
+      .split(";", 1)[0]
+      .trim()
+      .toLowerCase();
+    if (!TRANSCRIBE_AUDIO_TYPES.has(audioType)) {
+      audioBlob = null;
+      fallbackFromServer();
+      return;
+    }
+
+    const controller = new AbortController();
+    transcriptionController = controller;
+    let responseData = null;
+    try {
+      const response = await fetch("/api/transcribe", {
+        method: "POST",
+        headers: { "Content-Type": audioType },
+        body: audioBlob,
+        signal: controller.signal,
+      });
+      responseData = await response.json().catch(() => null);
+
+      if (
+        requestVersion !== micRequestVersion ||
+        activeTurnVersion !== turnVersion ||
+        !sessionActive ||
+        !state.voiceMode ||
+        state.voiceEngine !== "server"
+      ) return;
+
+      if (responseData?.reason === "no_key" || response.status >= 500) {
+        fallbackFromServer();
+        return;
+      }
+      if (!response.ok) {
+        showUnheard();
+        return;
+      }
+      if (typeof responseData?.text !== "string") {
+        fallbackFromServer();
+        return;
+      }
+
+      if (!voiceResultTracked) {
+        voiceResultTracked = true;
+        trackMetric("quiz_voice_ok");
+      }
+      const transcript = responseData.text.trim();
+      resetSpeakButton();
+      handleRecognitionResults(transcript ? [transcript] : []);
+    } catch {
+      if (
+        requestVersion === micRequestVersion &&
+        activeTurnVersion === turnVersion &&
+        sessionActive &&
+        state.voiceMode &&
+        state.voiceEngine === "server"
+      ) fallbackFromServer();
+    } finally {
+      if (transcriptionController === controller) {
+        transcriptionController = null;
+      }
+      audioBlob = null;
+      responseData = null;
+    }
+  }
+
+  function finishServerRecording() {
+    if (phase !== "recording" || !mediaRecorder) return;
+
+    phase = "processing";
+    clearRecordingTimer();
+    speakButton.disabled = true;
+    speakButton.textContent = "확인 중…";
+    speakButton.classList.remove("animate-pulse");
+    try {
+      mediaRecorder.stop();
+      // stop 이벤트를 기다리는 동안에도 마이크가 켜져 있지 않게 즉시 트랙을 끈다.
+      releaseMic();
+    } catch {
+      mediaRecorder = null;
+      recordingChunks = [];
+      releaseMic();
+      fallbackFromServer();
+    }
+  }
+
+  async function startServerRecording() {
+    if (["listening", "recording", "processing"].includes(phase)) return;
+
+    phase = "listening";
+    setNotice("");
+    setOnlyActions(speakButton);
+    speakButton.disabled = true;
+    const requestVersion = ++micRequestVersion;
+    const activeTurnVersion = turnVersion;
+
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      if (requestVersion !== micRequestVersion) return;
+      setVoiceMode(
+        false,
+        "말하기는 브라우저에서 마이크를 허용하면 쓸 수 있어요",
+      );
+      return;
+    }
+
+    if (
+      requestVersion !== micRequestVersion ||
+      activeTurnVersion !== turnVersion ||
+      !sessionActive ||
+      !state.voiceMode ||
+      state.voiceEngine !== "server"
+    ) {
+      stream.getTracks().forEach((track) => track.stop());
+      return;
+    }
+
+    let instance;
+    try {
+      instance = new window.MediaRecorder(stream);
+    } catch {
+      stream.getTracks().forEach((track) => track.stop());
+      fallbackFromServer();
+      return;
+    }
+
+    micStream = stream;
+    mediaRecorder = instance;
+    recordingChunks = [];
+
+    function isCurrent() {
+      return mediaRecorder === instance &&
+        requestVersion === micRequestVersion &&
+        activeTurnVersion === turnVersion &&
+        sessionActive &&
+        state.voiceMode &&
+        state.voiceEngine === "server";
+    }
+
+    function failRecording() {
+      if (!isCurrent()) return;
+      clearRecordingTimer();
+      mediaRecorder = null;
+      instance.ondataavailable = null;
+      instance.onerror = null;
+      instance.onstop = null;
+      if (instance.state !== "inactive") {
+        try {
+          instance.stop();
+        } catch {
+          // 실패 뒤 이미 멈춘 녹음기일 수 있다.
+        }
+      }
+      recordingChunks = [];
+      releaseMic();
+      fallbackFromServer();
+    }
+
+    instance.ondataavailable = (event) => {
+      if (isCurrent() && event.data.size > 0) recordingChunks.push(event.data);
+    };
+    instance.onerror = failRecording;
+    instance.onstop = () => {
+      const current = isCurrent();
+      const chunks = recordingChunks;
+      const recordedType = instance.mimeType || chunks[0]?.type || "";
+      mediaRecorder = null;
+      recordingChunks = [];
+      instance.ondataavailable = null;
+      instance.onerror = null;
+      instance.onstop = null;
+      if (!current) return;
+      void transcribeRecording(
+        chunks,
+        recordedType,
+        requestVersion,
+        activeTurnVersion,
+      );
+    };
+
+    try {
+      instance.start();
+    } catch {
+      failRecording();
+      return;
+    }
+    phase = "recording";
+    speakButton.disabled = false;
+    speakButton.textContent = "다 말했어요";
+    speakButton.classList.add("animate-pulse");
+    recordingTimer = window.setTimeout(finishServerRecording, 30000);
+  }
+
+  async function startBrowserRecognition() {
     if (phase === "listening") return;
 
     // WKWebView는 webkitSpeechRecognition을 노출하고도 동작하지 않는다. 따라서 이
     // 프로퍼티는 가용성 판정에 쓰지 않고, 생성 가능할 때도 실제 start()와 8초 동안의
     // 이벤트를 확인한다. 생성자 자체가 없을 때만 시도를 시작할 수 없어 무음으로 간다.
-    const SpeechRecognitionCtor =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognitionCtor) {
+      state.voiceEngine = null;
       setVoiceMode(
         false,
         "이 브라우저에서는 말하기가 안 되네요. 떠올리고 확인하는 방식으로 이어갈게요.",
@@ -491,6 +799,26 @@ function initializeQuiz() {
         "이 브라우저에서는 말하기가 안 되네요. 떠올리고 확인하는 방식으로 이어갈게요.",
       );
     }
+  }
+
+  function startRecognition() {
+    if (phase === "recording") {
+      finishServerRecording();
+      return;
+    }
+    if (["listening", "processing"].includes(phase)) return;
+    if (state.voiceEngine === "server") {
+      void startServerRecording();
+      return;
+    }
+    if (state.voiceEngine === "browser") {
+      void startBrowserRecognition();
+      return;
+    }
+    setVoiceMode(
+      false,
+      "이 브라우저에서는 말하기가 안 되네요. 떠올리고 확인하는 방식으로 이어갈게요.",
+    );
   }
 
   function updateProgress(index = state.index) {
