@@ -26,43 +26,56 @@
   <body class="m-0 bg-neutral font-sans text-ink">
     <div id="readingSurface" class="tier-root bg-neutral">
       <div class="tier-shell flex min-h-[var(--app-min-h)] flex-col pt-md">
-        <header class="flex min-h-11 items-center justify-between gap-4 pb-lg">
-          <button id="exitButton" type="button" class="bg-transparent p-0 text-[14px] font-medium text-ink-tertiary">✕ 나가기</button>
-          <p id="progressText" class="m-0 text-[14px] font-semibold tabular-nums text-ink-sub">1 / 1</p>
+        <header class="grid min-h-11 grid-cols-[1fr_auto_1fr] items-center gap-sm">
+          <button id="exitButton" type="button" class="inline-flex min-h-11 items-center gap-xs justify-self-start bg-transparent px-xs text-body-sm font-semibold text-ink-sub">
+            <span aria-hidden="true">✕</span>
+            <span>나가기</span>
+          </button>
+          <p id="progressText" class="m-0 justify-self-center text-body-sm font-semibold tabular-nums text-ink-sub">1 / 1</p>
+          <div id="pauseSlot" class="justify-self-end"></div>
         </header>
 
-        <!-- 대사 카드 하나만 작게 상단에 떠 있고 화면 절반 이상이 빈 회색으로 남는
-             문제가 있었다(가운데 정렬만으로는 위아래로 나뉠 뿐 빈 공간 총량이 그대로였다 —
-             실측: flex-1+justify-center로도 88% 그대로 비어 있었다). 카드 자체를
-             flex-1로 키워 화면을 채우고, 카드 안에서 역할·대사를 다시 세로 가운데로 둔다. -->
-        <main class="flex flex-1 flex-col gap-md">
-          <section id="currentLineCard" class="flex flex-1 flex-col items-center justify-center bg-surface p-5 rounded-xl shadow-card">
-            <p id="currentRoleName" class="mb-2 mt-0 text-[13px] font-bold tracking-[0.02em] text-primary"></p>
-            <p id="currentLineText" class="m-0 text-center font-script text-[22px] font-bold leading-[1.45] text-ink"></p>
-          </section>
+        <div id="progressTrack" class="mt-sm h-xs overflow-hidden rounded-pill bg-line" role="progressbar" aria-label="대본 진행" aria-valuemin="0" aria-valuemax="1" aria-valuenow="1">
+          <span id="progressBarFill" class="block h-full rounded-pill bg-primary"></span>
+        </div>
 
-          <div>
-            <span id="statusPill" class="inline-flex rounded-pill bg-surface px-3 py-1 text-[12px] font-semibold text-ink-sub" aria-live="polite">누르면 시작해요</span>
-            <p id="modeError" class="mb-0 mt-2 text-[13px] font-medium text-danger" aria-live="polite"></p>
+        <main class="flex min-h-0 flex-1 flex-col">
+          <div id="lineStage" class="flex min-h-0 flex-1 flex-col gap-md pt-lg">
+            <section id="previousTurn" class="px-xs" hidden>
+              <p id="previousRoleName" class="m-0 text-label text-ink-sub"></p>
+              <p id="previousLineText" class="mb-0 mt-xs line-clamp-2 font-script text-body-md text-ink-sub"></p>
+            </section>
+
+            <section id="currentLineCard" class="flex min-h-0 flex-col rounded-lg bg-surface p-5 shadow-card">
+              <p id="currentRoleName" class="mb-sm mt-0 text-label text-primary-strong"></p>
+              <p id="currentLineText" class="m-0 font-script text-[22px] font-semibold leading-[1.4] text-ink"></p>
+            </section>
+
+            <section id="nextTurn" class="px-xs" hidden>
+              <p id="nextRoleName" class="m-0 text-label text-ink-sub"></p>
+              <p id="nextLineText" class="mb-0 mt-xs line-clamp-2 font-script text-body-md text-ink-sub"></p>
+            </section>
+
+            <section id="completionMessage" class="hidden mt-auto flex-col rounded-lg bg-surface p-5 shadow-card">
+              <p class="m-0 text-h2">대본을 다 읽었어요</p>
+              <p class="mb-0 mt-md text-body-md text-ink-sub">
+                상대 대사는 기계가 읽었어. 근데 네 대사에 무슨 생각을 담을지는 네가 정한 거야.
+              </p>
+            </section>
+
+            <p id="modeError" class="m-0 text-body-sm font-medium text-danger" aria-live="polite"></p>
           </div>
-
-          <section id="completionMessage" class="hidden bg-surface p-5 rounded-xl shadow-card">
-            <p class="m-0 text-body-lg text-ink-sub">
-              상대 대사는 기계가 읽었어. 근데 네 대사에 무슨 생각을 담을지는 네가 정한 거야 —
-              <a href="https://acttub.com" class="font-semibold text-primary underline underline-offset-4">acttub에서 질문으로 →</a>
-            </p>
-          </section>
         </main>
 
         <footer class="pt-lg">
-          <!-- 시작 전엔 "시작"이 주 버튼(파란색)이고 "다음"은 비활성 — 그 순간 눌러야 할
-               것이 항상 파란 버튼이 되도록 app/prac.js의 syncControls()가 상태에 따라
-               이 두 클래스를 갈아 끼운다. 아래는 "시작 전" 초기값이다. -->
-          <div class="flex gap-3">
-            <button id="pauseButton" type="button" class="h-14 w-full flex-1 rounded-lg bg-primary-strong font-bold text-white active:bg-primary-deep disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-tertiary">시작</button>
-            <button id="nextButton" type="button" class="h-14 w-full flex-1 rounded-lg bg-primary-soft font-semibold text-primary active:bg-primary-soft-hover disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-tertiary" disabled>다음</button>
+          <div class="mb-md flex h-xl items-center">
+            <span id="statusPill" class="inline-flex rounded-pill bg-primary-soft px-md py-[6px] text-label text-primary-strong" aria-live="polite" hidden></span>
           </div>
-          <p id="modeHint" class="mb-0 mt-2 text-center text-[13px] font-medium text-ink-tertiary">시작을 누르면 읽어드릴게요</p>
+          <div id="actionSlot" class="grid">
+            <button id="pauseButton" type="button" class="col-start-1 row-start-1 flex h-xxl w-full items-center justify-center rounded-md bg-primary-strong text-subtitle text-white hover:bg-primary-deep active:scale-[0.98] active:bg-primary-deep disabled:pointer-events-none disabled:opacity-40">시작</button>
+            <button id="nextButton" type="button" class="col-start-1 row-start-1 flex h-xxl w-full items-center justify-center rounded-md bg-primary-soft text-subtitle text-primary-strong hover:bg-primary-soft-hover active:scale-[0.98] active:bg-primary-soft-hover disabled:pointer-events-none disabled:opacity-40" hidden disabled>다음</button>
+            <a id="completionCta" href="https://acttub.com" class="btn col-start-1 row-start-1 hidden h-xxl w-full items-center justify-center rounded-md bg-primary-strong text-subtitle text-white hover:bg-primary-deep active:scale-[0.98] active:bg-primary-deep">acttub에서 질문으로 →</a>
+          </div>
         </footer>
       </div>
     </div>

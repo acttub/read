@@ -42,23 +42,33 @@ function initializePracticePage() {
   const currentRoleName = document.getElementById("currentRoleName");
   const currentLineText = document.getElementById("currentLineText");
   const progressText = document.getElementById("progressText");
+  const progressTrack = document.getElementById("progressTrack");
+  const progressBarFill = document.getElementById("progressBarFill");
+  const previousTurn = document.getElementById("previousTurn");
+  const previousRoleName = document.getElementById("previousRoleName");
+  const previousLineText = document.getElementById("previousLineText");
+  const nextTurn = document.getElementById("nextTurn");
+  const nextRoleName = document.getElementById("nextRoleName");
+  const nextLineText = document.getElementById("nextLineText");
   const statusPill = document.getElementById("statusPill");
   const modeError = document.getElementById("modeError");
   const completionMessage = document.getElementById("completionMessage");
   const pauseButton = document.getElementById("pauseButton");
   const nextButton = document.getElementById("nextButton");
-  const modeHint = document.getElementById("modeHint");
+  const pauseSlot = document.getElementById("pauseSlot");
+  const actionSlot = document.getElementById("actionSlot");
+  const completionCta = document.getElementById("completionCta");
 
   const RMS_THRESHOLD = 0.02;
   const SpeechRecognitionCtor =
     window.SpeechRecognition || window.webkitSpeechRecognition;
 
-  // 그 순간 눌러야 할 것이 항상 파란 주 버튼이 되게 한다(시작 전엔 "시작", 내 차례를
-  // 기다릴 땐 "다음"). syncControls()가 이 두 클래스를 오가며 갈아 끼운다.
-  const PRIMARY_BUTTON_CLASS =
-    "h-14 w-full flex-1 rounded-lg bg-primary-strong font-bold text-white active:bg-primary-deep disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-tertiary";
-  const SECONDARY_BUTTON_CLASS =
-    "h-14 w-full flex-1 rounded-lg bg-primary-soft font-semibold text-primary active:bg-primary-soft-hover disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-tertiary";
+  const LARGE_PRIMARY_BUTTON_CLASS =
+    "col-start-1 row-start-1 flex h-xxl w-full items-center justify-center rounded-md bg-primary-strong text-subtitle text-white hover:bg-primary-deep active:scale-[0.98] active:bg-primary-deep disabled:pointer-events-none disabled:opacity-40";
+  const LARGE_SECONDARY_BUTTON_CLASS =
+    "col-start-1 row-start-1 flex h-xxl w-full items-center justify-center rounded-md bg-primary-soft text-subtitle text-primary-strong hover:bg-primary-soft-hover active:scale-[0.98] active:bg-primary-soft-hover disabled:pointer-events-none disabled:opacity-40";
+  const TOP_SECONDARY_BUTTON_CLASS =
+    "inline-flex min-h-11 items-center justify-center rounded-md bg-primary-soft px-[14px] text-body-sm font-semibold text-primary-strong hover:bg-primary-soft-hover active:scale-[0.98] active:bg-primary-soft-hover disabled:pointer-events-none disabled:opacity-40";
 
   let idx = 0;
   let sessionActive = true;
@@ -99,35 +109,75 @@ function initializePracticePage() {
   let speechWatchdogDueAt = 0;
   let speechWatchdogRemainingMs = 0;
 
-  const modeHints = {
-    tap: "화면을 누르면 다음으로",
-    silence: "말이 끝나고 잠깐 조용해지면 다음으로 넘어가요",
-    cue: "마지막 어절이 들리면 다음으로",
+  const myTurnStatuses = {
+    tap: "내 차례 · 화면을 누르면 넘어가요",
+    silence: "기다리는 중 · 조용해지면 넘어가요",
+    cue: "기다리는 중 · 마지막 어절이 들리면 넘어가요",
   };
 
-  function setStatus(text, tone = "neutral") {
+  function setStatus(text) {
     statusPill.textContent = text;
-    statusPill.className =
-      tone === "primary"
-        ? "inline-flex rounded-pill bg-primary-soft px-3 py-1 text-[12px] font-semibold text-primary"
-        : "inline-flex rounded-pill bg-surface px-3 py-1 text-[12px] font-semibold text-ink-sub";
+    statusPill.hidden = !text;
+  }
+
+  function renderPreview(container, roleName, lineText, turn, position) {
+    container.hidden = !turn;
+    if (!turn) return;
+
+    const isMyTurn = turn.role === myRole && !turn.isDirection;
+    roleName.hidden = turn.isDirection;
+    roleName.textContent =
+      position === "next"
+        ? `다음 · ${turn.role}${isMyTurn ? " · 내 차례" : ""}`
+        : position === "last"
+          ? `마지막 대사 · ${turn.role}`
+          : turn.role;
+    roleName.className = isMyTurn && position === "next"
+      ? "m-0 text-label text-primary-strong"
+      : "m-0 text-label text-ink-sub";
+    lineText.textContent = turn.text;
+  }
+
+  function renderProgress() {
+    const current = Math.min(idx + 1, turns.length);
+    const total = turns.length;
+    const ratio = total > 0 ? current / total : 0;
+
+    progressText.textContent = `${current} / ${total}`;
+    progressTrack.setAttribute("aria-valuemax", String(total));
+    progressTrack.setAttribute("aria-valuenow", String(current));
+    progressBarFill.style.width = `${ratio * 100}%`;
   }
 
   function renderCurrentTurn(turn) {
-    progressText.textContent = `${idx + 1} / ${turns.length}`;
-    currentRoleName.textContent =
-      turn.role === myRole && !turn.isDirection
-        ? `${turn.role} · 내 차례`
-        : turn.role;
-    currentLineText.textContent = turn.text;
+    renderProgress();
+    renderPreview(
+      previousTurn,
+      previousRoleName,
+      previousLineText,
+      turns[idx - 1],
+      "previous",
+    );
+    renderPreview(
+      nextTurn,
+      nextRoleName,
+      nextLineText,
+      turns[idx + 1],
+      "next",
+    );
 
     const isMyTurn = turn.role === myRole && !turn.isDirection;
+    currentRoleName.hidden = turn.isDirection;
+    currentRoleName.textContent = isMyTurn
+      ? `${turn.role} · 내 차례`
+      : turn.role;
+    currentLineText.textContent = turn.text;
     currentLineCard.classList.toggle("bg-primary-soft", isMyTurn);
     currentLineCard.classList.toggle("bg-surface", !isMyTurn);
 
     currentLineText.className = turn.isDirection
-      ? "m-0 font-script text-[16px] font-normal italic leading-[1.6] text-ink-tertiary"
-      : "m-0 font-script text-[22px] font-bold leading-[1.45] text-ink";
+      ? "m-0 font-script text-body-lg font-medium text-ink-sub"
+      : "m-0 font-script text-[22px] font-semibold leading-[1.4] text-ink";
   }
 
   function renderInitialState() {
@@ -139,17 +189,17 @@ function initializePracticePage() {
     }
 
     renderCurrentTurn(turns[0]);
-    // "/char"에서 이미 "연습 시작"을 눌렀는데 여기서 또 눌러야 해서(iOS 발화 잠금 때문에
-    // 불가피하다) 화면이 침묵하면 멈춘 것처럼 보인다. 알약과 힌트가 먼저 무엇을 눌러야
-    // 하는지 말한다. 넘김 방식별 힌트("화면을 누르면 다음으로" 등)는 실제로 시작한 뒤에나
-    // 의미가 있으므로 그 전엔 보여주지 않는다.
-    setStatus("누르면 시작해요");
-    modeHint.textContent = "시작을 누르면 읽어드릴게요";
+    progressText.hidden = false;
+    progressTrack.hidden = false;
+    currentLineCard.hidden = false;
+    completionMessage.classList.add("hidden");
+    completionMessage.classList.remove("flex");
+    setStatus("");
     syncControls();
   }
 
-  // 버튼 활성/비활성과 "지금 눌러야 할 파란 버튼이 어느 쪽인가"를 한곳에서 정한다.
-  // 상태(started/paused/ended/waitingForMyTurn)가 바뀌는 모든 지점에서 이것 하나만 부른다.
+  // 하단 엄지 자리엔 큰 버튼 하나만 둔다. 시작 전엔 기존 pauseButton을
+  // 하단에 두고, 시작한 뒤엔 같은 버튼을 상단 일시정지 자리로 옮긴다.
   function syncControls() {
     pauseButton.disabled = ended;
     // "다음"은 내 차례를 기다릴 때만이 아니라, 시작한 뒤라면(상대역이 읽어주는 중이든
@@ -158,15 +208,30 @@ function initializePracticePage() {
     // 동작이기도 하다.
     nextButton.disabled = !started || paused || ended;
 
-    const pauseIsPrimary = !started || paused;
-    pauseButton.className = pauseIsPrimary
-      ? PRIMARY_BUTTON_CLASS
-      : SECONDARY_BUTTON_CLASS;
+    completionCta.classList.toggle("hidden", !ended);
+    completionCta.classList.toggle("flex", ended);
 
-    const nextIsPrimary = started && !paused && !ended && waitingForMyTurn;
-    nextButton.className = nextIsPrimary
-      ? PRIMARY_BUTTON_CLASS
-      : SECONDARY_BUTTON_CLASS;
+    if (ended) {
+      pauseButton.hidden = true;
+      nextButton.hidden = true;
+      return;
+    }
+
+    if (!started) {
+      actionSlot.append(pauseButton);
+      pauseButton.hidden = false;
+      pauseButton.className = LARGE_PRIMARY_BUTTON_CLASS;
+      nextButton.hidden = true;
+      return;
+    }
+
+    pauseSlot.append(pauseButton);
+    pauseButton.hidden = false;
+    pauseButton.className = TOP_SECONDARY_BUTTON_CLASS;
+    nextButton.hidden = false;
+    nextButton.className = advanceMode === "tap"
+      ? LARGE_PRIMARY_BUTTON_CLASS
+      : LARGE_SECONDARY_BUTTON_CLASS;
   }
 
   function stopDirectionTimer({ preserveRemaining = false } = {}) {
@@ -376,7 +441,7 @@ function initializePracticePage() {
     const lineCount = cloudTurns.length;
     pauseButton.disabled = true;
     pauseButton.textContent = `목소리 준비 중… (${lineCount}줄)`;
-    setStatus(`목소리 준비 중… (${lineCount}줄)`, "primary");
+    setStatus(`목소리 준비 중… (${lineCount}줄)`);
 
     try {
       if (lineCount === 0) return true;
@@ -686,7 +751,7 @@ function initializePracticePage() {
 
   function showMyTurn(turn, { reset = true } = {}) {
     waitingForMyTurn = true;
-    setStatus("말이 끝나길 기다리는 중");
+    setStatus(myTurnStatuses[advanceMode]);
     syncControls();
 
     if (advanceMode === "silence") {
@@ -728,7 +793,7 @@ function initializePracticePage() {
     renderCurrentTurn(turn);
 
     if (turn.isDirection) {
-      setStatus("지문");
+      setStatus("지문 · 잠시 뒤 넘어가요");
       directionRemainingMs = 700;
       scheduleDirectionAdvance(turn, directionRemainingMs);
       return;
@@ -739,7 +804,7 @@ function initializePracticePage() {
       return;
     }
 
-    setStatus("읽어주는 중", "primary");
+    setStatus("읽어주는 중 · 끝나면 넘어가요");
     speakLine(turn);
   }
 
@@ -792,7 +857,7 @@ function initializePracticePage() {
 
     if (isCloudUtterance() && speechWasPaused) {
       speechWasPaused = false;
-      setStatus("읽어주는 중", "primary");
+      setStatus("읽어주는 중 · 끝나면 넘어가요");
       playCloudAudio(currentUtterance, turns[idx]);
       scheduleSpeechWatchdog(
         turns[idx],
@@ -804,7 +869,7 @@ function initializePracticePage() {
 
     if (currentUtterance && speechWasPaused && supportsSpeechSynthesis()) {
       speechWasPaused = false;
-      setStatus("읽어주는 중", "primary");
+      setStatus("읽어주는 중 · 끝나면 넘어가요");
       window.speechSynthesis.resume();
       scheduleSpeechWatchdog(
         turns[idx],
@@ -821,7 +886,7 @@ function initializePracticePage() {
     }
 
     if (turn.isDirection && directionRemainingMs >= 0) {
-      setStatus("지문");
+      setStatus("지문 · 잠시 뒤 넘어가요");
       scheduleDirectionAdvance(turn, directionRemainingMs);
       syncControls();
       return;
@@ -853,16 +918,20 @@ function initializePracticePage() {
       window.speechSynthesis.cancel();
     }
 
-    progressText.textContent =
-      turns.length > 0 ? `${turns.length} / ${turns.length}` : "0 / 0";
-    currentRoleName.textContent = "";
-    currentLineText.textContent = "대본을 다 읽었어요";
-    currentLineText.className =
-      "m-0 font-script text-[22px] font-bold leading-[1.45] text-ink";
-    currentLineCard.classList.remove("bg-primary-soft");
-    currentLineCard.classList.add("bg-surface");
+    progressText.hidden = true;
+    progressTrack.hidden = true;
+    renderPreview(
+      previousTurn,
+      previousRoleName,
+      previousLineText,
+      turns[turns.length - 1],
+      "last",
+    );
+    currentLineCard.hidden = true;
+    nextTurn.hidden = true;
     completionMessage.classList.remove("hidden");
-    setStatus("완료");
+    completionMessage.classList.add("flex");
+    setStatus("");
     modeError.textContent = "";
     pauseButton.textContent = "일시정지";
     syncControls();
@@ -1006,9 +1075,7 @@ function initializePracticePage() {
     window.location.href = "/input";
   });
 
-  const coreLink = completionMessage.querySelector(
-    'a[href="https://acttub.com"]',
-  );
+  const coreLink = completionCta;
   if (coreLink) {
     coreLink.addEventListener("click", () => {
       trackCore("read", coreLink.href);
