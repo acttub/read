@@ -9,5 +9,5 @@ trackEvent("landing_view");
 document.getElementById("sampleScriptButton").addEventListener("click", () => {
   saveScript(SAMPLE_SCRIPT);
   trackEvent("sample_script_load");
-  window.location.href = "/char";
+  window.location.href = "/script";
 });

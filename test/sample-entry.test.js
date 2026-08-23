@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { SAMPLE_SCRIPT } from "../app/sample-script.js";
@@ -63,6 +64,28 @@ function makeDocument(ids) {
   };
 }
 
+test("랜딩 히어로의 두 CTA는 같은 크기의 버튼으로 나란히 놓인다", async () => {
+  const [html, css] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../src/input.css", import.meta.url), "utf8"),
+  ]);
+  const actions = html.match(/<div class="home-actions">([\s\S]*?)<\/div>/)?.[1];
+
+  assert.ok(actions);
+  assert.match(actions, /class="button-primary button-large"[^>]*>대본 넣기<\/a>/);
+  assert.match(actions, /class="button-secondary button-large"[^>]*>예시 대본으로 해보기<\/button>/);
+  assert.equal(actions.match(/button-large/g)?.length, 2);
+  assert.doesNotMatch(html, /class="button-text[^"]*"[^>]*>예시 대본/);
+  assert.match(
+    css,
+    /\.home-actions\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/,
+  );
+  assert.doesNotMatch(
+    css,
+    /\.home-actions\s*\{[^}]*grid-template-columns:\s*auto auto/,
+  );
+});
+
 test("두 예시 입구가 같은 대본을 쓰고 사용 이벤트는 세션에서 한 번만 보낸다", async () => {
   const originalGlobals = new Map(
     ["document", "getComputedStyle", "location", "navigator", "sessionStorage", "window"]
@@ -103,7 +126,7 @@ test("두 예시 입구가 같은 대본을 쓰고 사용 이벤트는 세션에
     homeDocument.elements.get("sampleScriptButton").click();
 
     assert.equal(sessionStorage.getItem("read.script"), SAMPLE_SCRIPT);
-    assert.equal(homeWindow.location.href, "/char");
+    assert.equal(homeWindow.location.href, "/script");
 
     const inputIds = [
       "scriptInput",
@@ -125,6 +148,7 @@ test("두 예시 입구가 같은 대본을 쓰고 사용 이벤트는 세션에
       "manualRolesInput",
     ];
     const inputDocument = makeDocument(inputIds);
+    const inputWindow = { addEventListener() {}, location: { href: "" } };
     Object.defineProperties(globalThis, {
       document: { configurable: true, value: inputDocument },
       getComputedStyle: {
@@ -133,7 +157,7 @@ test("두 예시 입구가 같은 대본을 쓰고 사용 이벤트는 세션에
       },
       window: {
         configurable: true,
-        value: { addEventListener() {}, location: { href: "" } },
+        value: inputWindow,
       },
     });
 
@@ -146,11 +170,18 @@ test("두 예시 입구가 같은 대본을 쓰고 사용 이벤트는 세션에
     assert.equal(inputDocument.elements.get("continueButton").disabled, false);
     assert.equal(inputDocument.elements.get("roleChips").children.length, 2);
 
+    inputDocument.elements.get("continueButton").click();
+    assert.equal(inputWindow.location.href, "/script");
+
     const payloads = await Promise.all(
       sent.map(async ({ body }) => JSON.parse(await body.text())),
     );
     assert.equal(
       payloads.filter(({ name }) => name === "sample_script_load").length,
+      1,
+    );
+    assert.equal(
+      payloads.filter(({ name }) => name === "script_submit").length,
       1,
     );
   } finally {

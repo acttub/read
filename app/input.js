@@ -266,7 +266,7 @@ continueButton.addEventListener("click", () => {
   else if (lineCount <= 60) trackMetric("script_lines_m");
   else trackMetric("script_lines_l");
 
-  window.location.href = "/char";
+  window.location.href = "/script";
 });
 
 window.addEventListener("resize", resizeScriptInput);

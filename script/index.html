@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>대본 보기 · acttub</title>
+    <meta name="description" content="배역별로 나뉜 대사를 확인하고 내 배역을 고르세요. 대본은 이 기기에만 저장돼요.">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <!-- GA4. 프로덕션 호스트에서만 로드한다 — 로컬·프리뷰 유입은 집계하지 않는다. -->
+    <script>
+    (function(){
+      if(!/(^|\.)acttub\.com$/.test(location.hostname))return;
+      var ID='G-DRMEWBN9Y9';
+      var s=document.createElement('script');
+      s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id='+ID;
+      document.head.appendChild(s);
+      window.dataLayer=window.dataLayer||[];
+      window.gtag=function(){window.dataLayer.push(arguments);};
+      window.gtag('js',new Date());
+      window.gtag('consent','default',{analytics_storage:'denied'});
+      window.gtag('config',ID);
+    })();
+    </script>
+  </head>
+  <body class="script-page m-0 bg-canvas font-sans text-ink">
+    <header class="desktop-header" data-tier-only="desktop">
+      <div class="desktop-header-inner">
+        <a class="brand-lockup" href="/" aria-label="acttub read 홈"><span class="brand-mark" aria-hidden="true"></span><span>acttub read</span></a>
+        <nav class="desktop-nav" aria-label="주요 단계">
+          <a href="/">홈</a><a class="is-active" href="/input" aria-current="page">대본</a><a href="/char">리딩</a><a href="/quiz#completionState">요약</a>
+        </nav>
+        <div class="desktop-actions"><a class="button-secondary" href="/input">새 대본</a><a class="button-primary" href="/char">바로 리딩</a></div>
+      </div>
+    </header>
+
+    <div class="tier-root app-page">
+      <div class="tier-shell script-shell">
+        <a class="brand-lockup mobile-brand" href="/" aria-label="acttub read 홈"><span class="brand-mark" aria-hidden="true"></span><span>acttub read</span></a>
+        <header class="page-intro">
+          <div>
+            <h1>대본 보기</h1>
+            <p>대사가 배역별로 나뉘었는지 확인하세요.</p>
+          </div>
+          <ol class="step-rail" aria-label="리딩 준비 단계">
+            <li class="is-done">대본 넣기</li><li>배역 정하기</li><li>바로 리딩</li>
+          </ol>
+        </header>
+
+        <main class="script-review-workspace">
+          <section class="workspace-card script-review-card" aria-labelledby="scriptReviewTitle">
+            <div class="card-heading">
+              <div><h2 id="scriptReviewTitle">전체 대본</h2><p>처음부터 끝까지 이어서 확인하세요.</p></div>
+            </div>
+            <div id="scriptTurns" class="script-turn-list"></div>
+            <div class="script-review-actions">
+              <button id="chooseRoleButton" type="button" class="button-primary button-large">배역 고르기</button>
+              <a class="button-text" href="/input">대본 다시 넣기</a>
+            </div>
+          </section>
+        </main>
+
+        <footer class="privacy-footnote">
+          <p>대본은 이 기기에만 저장돼요.</p>
+          <a href="/privacy">대본은 어디로 가나요</a>
+        </footer>
+      </div>
+    </div>
+
+    <nav class="mobile-tabs" aria-label="주요 단계" data-tier-only="phone">
+      <a href="/"><span class="tab-icon">⌂</span><span>홈</span></a>
+      <a class="is-active" href="/input" aria-current="page"><span class="tab-icon">▤</span><span>대본</span></a>
+      <a href="/char"><span class="tab-icon">▷</span><span>리딩</span></a>
+      <a href="/quiz#completionState"><span class="tab-icon">▥</span><span>요약</span></a>
+    </nav>
+    <script type="module" src="/app/script.js"></script>
+  </body>
+</html>

@@ -1,6 +1,7 @@
 @import "tailwindcss" source(none);
 @source "../index.html";
 @source "../input/index.html";
+@source "../script/index.html";
 @source "../char/index.html";
 @source "../prac/index.html";
 @source "../quiz/index.html";
@@ -273,7 +274,9 @@ button {
 
 .home-actions {
   margin-top: 24px;
+  width: min(100%, 430px);
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -708,6 +711,63 @@ button {
   display: inline-flex;
   align-items: center;
   text-decoration: underline;
+}
+
+/* 대본 보기 */
+.script-review-workspace {
+  width: min(100%, 760px);
+  margin-inline: auto;
+}
+
+.script-turn-list {
+  display: grid;
+  gap: 8px;
+}
+
+.script-turn {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  background: var(--color-canvas);
+}
+
+.script-turn-role {
+  margin: 0 0 8px;
+  color: var(--color-ink-soft);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.script-turn-text {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-script);
+  font-size: 16px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.script-turn.is-direction .script-turn-text {
+  color: var(--color-ink-muted);
+  font-size: 15px;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.script-review-actions {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.script-review-actions .button-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .char-shell {
@@ -1556,8 +1616,8 @@ button {
   }
 
   .home-actions {
-    width: fit-content;
-    grid-template-columns: auto auto;
+    width: min(100%, 430px);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .step-rail {
