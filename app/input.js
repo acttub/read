@@ -1,4 +1,5 @@
 import { parseScript, parseScriptWithRoles } from "./parse.js";
+import { SAMPLE_SCRIPT } from "./sample-script.js";
 import { readScriptFile, ScriptFileError } from "./scriptfile.js";
 import { saveScript } from "./storage.js";
 import { trackEvent, trackMetric } from "./tracking.js";
@@ -12,6 +13,7 @@ const emptyState = document.getElementById("emptyState");
 const inputState = document.getElementById("inputState");
 const pasteButton = document.getElementById("pasteButton");
 const writeButton = document.getElementById("writeButton");
+const sampleScriptButton = document.getElementById("sampleScriptButton");
 const resetButton = document.getElementById("resetButton");
 const pasteGuidance = document.getElementById("pasteGuidance");
 const scriptFileInput = document.getElementById("scriptFileInput");
@@ -142,6 +144,16 @@ function showInputState({ focus = false, guidance = "" } = {}) {
   }
 }
 
+function loadTextIntoInput(text, { focusWhenEmpty = false, guidance = "" } = {}) {
+  const hasText = typeof text === "string" && text.trim().length > 0;
+  scriptInput.value = hasText ? text : "";
+  hasInteracted = hasText;
+  showInputState({
+    focus: focusWhenEmpty && !hasText,
+    guidance: hasText ? "" : guidance,
+  });
+}
+
 function showEmptyState() {
   scriptInput.value = "";
   manualRolesInput.value = "";
@@ -202,13 +214,9 @@ pasteButton.addEventListener("click", async () => {
     clipboardText = "";
   }
 
-  const hasClipboardText =
-    typeof clipboardText === "string" && clipboardText.trim().length > 0;
-  scriptInput.value = hasClipboardText ? clipboardText : "";
-  hasInteracted = hasClipboardText;
-  showInputState({
-    focus: !hasClipboardText,
-    guidance: hasClipboardText ? "" : "여기에 붙여넣어 주세요.",
+  loadTextIntoInput(clipboardText, {
+    focusWhenEmpty: true,
+    guidance: "여기에 붙여넣어 주세요.",
   });
 });
 
@@ -217,6 +225,12 @@ writeButton.addEventListener("click", () => {
   scriptInput.value = "";
   hasInteracted = false;
   showInputState({ focus: true });
+});
+
+sampleScriptButton.addEventListener("click", () => {
+  showFileStatus("");
+  loadTextIntoInput(SAMPLE_SCRIPT);
+  trackEvent("sample_script_load");
 });
 
 resetButton.addEventListener("click", showEmptyState);
