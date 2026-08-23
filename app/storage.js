@@ -91,11 +91,11 @@ export function readVoiceId() {
 export function saveMode(mode) {
   sessionStorage.setItem(
     STORAGE_KEYS.mode,
-    MODES.has(mode) ? mode : "read",
+    MODES.has(mode) ? mode : "quiz",
   );
 }
 
 export function readMode() {
   const stored = sessionStorage.getItem(STORAGE_KEYS.mode);
-  return MODES.has(stored) ? stored : "read";
+  return MODES.has(stored) ? stored : "quiz";
 }
