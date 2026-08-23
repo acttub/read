@@ -1,4 +1,9 @@
-import { compare, normalize } from "./match.js";
+import {
+  compare,
+  normalize,
+  scoreVoiceAttempt,
+  summarizeVoiceAttempts,
+} from "./match.js";
 import { parseScript } from "./parse.js";
 import { readMyRole, readScript } from "./storage.js";
 import { trackMetric, withInboundAdId } from "./tracking.js";
@@ -43,6 +48,7 @@ function initializeQuiz() {
     index: 0,
     status: new Map(),
     attempts: new Map(),
+    voiceAttempts: [],
     hintWords: new Map(),
     voiceMode: !inAppBrowser && initialVoiceEngine !== null,
     voiceEngine: initialVoiceEngine,
@@ -51,6 +57,7 @@ function initializeQuiz() {
   const emptyState = document.getElementById("emptyState");
   const quizStage = document.getElementById("quizStage");
   const completionState = document.getElementById("completionState");
+  const summaryMetrics = document.getElementById("summaryMetrics");
   const reviewSection = document.getElementById("reviewSection");
   const reviewList = document.getElementById("reviewList");
   const progressBar = document.getElementById("progressBar");
@@ -339,6 +346,13 @@ function initializeQuiz() {
       setNotice("안 들렸어요, 다시 눌러주세요");
       showReadyMyTurn(turn);
       return;
+    }
+
+    for (const transcript of transcripts) {
+      state.voiceAttempts.push({
+        lineIndex: state.index,
+        ...scoreVoiceAttempt(turn.text, transcript),
+      });
     }
 
     const results = transcripts.map((transcript) =>
@@ -944,6 +958,35 @@ function initializeQuiz() {
     if (!finishTracked) {
       finishTracked = true;
       trackMetric("quiz_finish");
+    }
+
+    const summary = summarizeVoiceAttempts(state.voiceAttempts);
+    summaryMetrics.replaceChildren();
+    if (summary) {
+      const metrics = [
+        ["대사 정확도", summary.dialogueAccuracy],
+        ["발음 정확도", summary.pronunciationAccuracy],
+      ];
+      const fragment = document.createDocumentFragment();
+      for (const [label, value] of metrics) {
+        const card = document.createElement("article");
+        card.className =
+          "rounded-lg border border-line bg-surface p-md shadow-card";
+        const valueElement = document.createElement("p");
+        valueElement.className =
+          "m-0 text-h1 font-bold text-primary-strong";
+        valueElement.textContent = `${value}%`;
+        const labelElement = document.createElement("p");
+        labelElement.className =
+          "mb-0 mt-xs text-[13px] font-medium text-ink-sub";
+        labelElement.textContent = label;
+        card.append(valueElement, labelElement);
+        fragment.append(card);
+      }
+      summaryMetrics.append(fragment);
+      summaryMetrics.hidden = false;
+    } else {
+      summaryMetrics.hidden = true;
     }
 
     const revealedIndexes = [...state.status]

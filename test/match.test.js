@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { compare, normalize, toJamo } from "../app/match.js";
+import {
+  compare,
+  jamoSimilarity,
+  normalize,
+  scoreVoiceAttempt,
+  summarizeVoiceAttempts,
+  toJamo,
+  wordMatchRatio,
+} from "../app/match.js";
 
 function assertPassAndMiss(original, spoken) {
   assert.equal(compare(original, spoken).passed, true);
@@ -73,4 +81,40 @@ test("표시 조각은 원문 어절 기준이고 비율을 반환하지 않는�
   assert.ok(result.segments.some(({ matched }) => !matched));
   assert.equal(Object.hasOwn(result, "ratio"), false);
   assert.deepEqual(toJamo("났"), "ㄴㅏㅆ");
+});
+
+test("요약할 음성 시도가 없으면 지표를 만들지 않는다", () => {
+  assert.equal(summarizeVoiceAttempts([]), null);
+});
+
+test("완전히 일치한 시도는 어절과 자모가 모두 1이다", () => {
+  assert.equal(wordMatchRatio("오늘은 여기까지 하자.", "오늘은 여기까지 하자"), 1);
+  assert.equal(jamoSimilarity("오늘은 여기까지 하자.", "오늘은 여기까지 하자"), 1);
+});
+
+test("완전히 불일치한 시도는 어절과 자모가 모두 0이다", () => {
+  assert.equal(wordMatchRatio("가", "힣"), 0);
+  assert.equal(jamoSimilarity("가", "힣"), 0);
+});
+
+test("줄마다 최고 시도를 고르고 조용히 통과한 줄도 평균에 넣는다", () => {
+  const summary = summarizeVoiceAttempts([
+    { lineIndex: 0, ...scoreVoiceAttempt("가", "힣") },
+    { lineIndex: 0, ...scoreVoiceAttempt("가", "가") },
+    {
+      lineIndex: 1,
+      ...scoreVoiceAttempt("가", "힣"),
+      quietlyPassed: true,
+    },
+    {
+      lineIndex: 1,
+      ...scoreVoiceAttempt("가", "힣"),
+      quietlyPassed: true,
+    },
+  ]);
+
+  assert.deepEqual(summary, {
+    dialogueAccuracy: 50,
+    pronunciationAccuracy: 50,
+  });
 });

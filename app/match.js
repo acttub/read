@@ -86,6 +86,78 @@ function levenshtein(left, right) {
   return previous[b.length];
 }
 
+export function wordMatchRatio(original, spoken) {
+  const originalWords = normalize(original).split(/\s+/).filter(Boolean);
+  const spokenWords = normalize(spoken).split(/\s+/).filter(Boolean);
+  if (originalWords.length === 0 && spokenWords.length === 0) return 1;
+
+  const rows = originalWords.length + 1;
+  const columns = spokenWords.length + 1;
+  const lcs = Array.from({ length: rows }, () => Array(columns).fill(0));
+
+  for (let row = 1; row < rows; row += 1) {
+    for (let column = 1; column < columns; column += 1) {
+      lcs[row][column] =
+        originalWords[row - 1] === spokenWords[column - 1]
+          ? lcs[row - 1][column - 1] + 1
+          : Math.max(lcs[row - 1][column], lcs[row][column - 1]);
+    }
+  }
+
+  return lcs[originalWords.length][spokenWords.length] /
+    Math.max(originalWords.length, spokenWords.length, 1);
+}
+
+export function jamoSimilarity(original, spoken) {
+  const originalJamo = toJamo(normalize(original).replace(/\s/g, ""));
+  const spokenJamo = toJamo(normalize(spoken).replace(/\s/g, ""));
+  const distance = levenshtein(originalJamo, spokenJamo);
+  return 1 - distance / Math.max(originalJamo.length, spokenJamo.length, 1);
+}
+
+export function scoreVoiceAttempt(original, spoken) {
+  return {
+    dialogue: wordMatchRatio(original, spoken),
+    pronunciation: jamoSimilarity(original, spoken),
+  };
+}
+
+export function summarizeVoiceAttempts(attempts) {
+  const bestByLine = new Map();
+
+  for (const attempt of attempts) {
+    if (!attempt || !Number.isInteger(attempt.lineIndex)) continue;
+    if (
+      !Number.isFinite(attempt.dialogue) ||
+      !Number.isFinite(attempt.pronunciation)
+    ) continue;
+    const best = bestByLine.get(attempt.lineIndex);
+    bestByLine.set(attempt.lineIndex, {
+      dialogue: Math.max(best?.dialogue ?? 0, attempt.dialogue),
+      pronunciation: Math.max(
+        best?.pronunciation ?? 0,
+        attempt.pronunciation,
+      ),
+    });
+  }
+
+  if (bestByLine.size === 0) return null;
+  const totals = [...bestByLine.values()].reduce(
+    (sum, scores) => ({
+      dialogue: sum.dialogue + scores.dialogue,
+      pronunciation: sum.pronunciation + scores.pronunciation,
+    }),
+    { dialogue: 0, pronunciation: 0 },
+  );
+
+  return {
+    dialogueAccuracy: Math.round(100 * totals.dialogue / bestByLine.size),
+    pronunciationAccuracy: Math.round(
+      100 * totals.pronunciation / bestByLine.size,
+    ),
+  };
+}
+
 function usesExactMode(options) {
   const mode = options?.mode ?? options?.strictness;
   return options?.strict === true ||
