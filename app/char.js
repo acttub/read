@@ -718,9 +718,7 @@ function initializeCharacterPage(scriptText) {
   }
 
   repopulateVoiceSelects();
-  const initialProductMode = location.hostname.startsWith("cue.")
-    ? "quiz"
-    : readMode();
+  const initialProductMode = readMode();
   document.querySelector(
     `input[name="practiceMode"][value="${initialProductMode}"]`,
   ).checked = true;
