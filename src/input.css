@@ -373,7 +373,6 @@ button {
 }
 
 .preview-turn.is-mine {
-  min-height: 112px;
   border-color: transparent;
   background: var(--color-primary-soft);
   box-shadow: inset 3px 0 0 var(--color-primary);
@@ -391,22 +390,30 @@ button {
   color: var(--color-primary);
 }
 
-.preview-line {
+.preview-blocks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.preview-blocks span {
+  height: 24px;
+  border: 1px dashed color-mix(in srgb, var(--color-primary) 45%, white);
+  border-radius: 8px;
+  background: var(--color-white);
+}
+
+.preview-blocks span:nth-child(1) { width: 56px; }
+.preview-blocks span:nth-child(2) { width: 88px; }
+.preview-blocks span:nth-child(3) { width: 48px; }
+.preview-blocks span:nth-child(4) { width: 72px; }
+
+.preview-text {
   display: block;
-  width: 88%;
-  height: 10px;
-  margin-top: 8px;
-  border-radius: 999px;
-  background: var(--color-line-strong);
-}
-
-.is-mine .preview-line {
-  height: 12px;
-  background: color-mix(in srgb, var(--color-primary) 23%, white);
-}
-
-.preview-line.short {
-  width: 62%;
+  color: var(--color-ink);
+  font-family: var(--font-script);
+  font-size: 15px;
+  line-height: 1.5;
 }
 
 .home-features {
@@ -1566,10 +1573,6 @@ button {
   .preview-turn {
     min-height: 92px;
     padding: 16px;
-  }
-
-  .preview-turn.is-mine {
-    min-height: 124px;
   }
 
   .script-shell {
