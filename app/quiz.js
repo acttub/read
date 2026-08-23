@@ -61,6 +61,10 @@ function initializeQuiz() {
   const reviewSection = document.getElementById("reviewSection");
   const reviewList = document.getElementById("reviewList");
   const progressBar = document.getElementById("progressBar");
+  const quizRemaining = document.getElementById("quizRemaining");
+  const quizRemainingDesktop = document.getElementById("quizRemainingDesktop");
+  const quizElapsed = document.getElementById("quizElapsed");
+  const quizElapsedDesktop = document.getElementById("quizElapsedDesktop");
   const sceneLabel = document.getElementById("sceneLabel");
   const pastTurns = document.getElementById("pastTurns");
   const futureMarker = document.getElementById("futureMarker");
@@ -111,8 +115,38 @@ function initializeQuiz() {
   let voiceDeadTracked = false;
   let voiceFallbackTracked = false;
   let finishTracked = false;
+  const sessionStartedAt = Date.now();
+  let sessionClockTimer = null;
 
   trackMetric("quiz_start");
+
+  function formatElapsed(ms) {
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  function updateElapsedTime() {
+    const value = formatElapsed(Date.now() - sessionStartedAt);
+    if (quizElapsed) quizElapsed.textContent = value;
+    if (quizElapsedDesktop) quizElapsedDesktop.textContent = value;
+  }
+
+  function scheduleSessionClock() {
+    updateElapsedTime();
+    sessionClockTimer = window.setTimeout(() => {
+      sessionClockTimer = null;
+      if (!sessionActive || finishTracked) return;
+      scheduleSessionClock();
+    }, 1000);
+  }
+
+  function stopSessionClock() {
+    if (sessionClockTimer) window.clearTimeout(sessionClockTimer);
+    sessionClockTimer = null;
+    updateElapsedTime();
+  }
 
   function setNotice(message) {
     modeNotice.textContent = message;
@@ -840,6 +874,9 @@ function initializeQuiz() {
       ? 0
       : Math.min(Math.max(index / turns.length, 0), 1);
     progressBar.style.width = `${fraction * 100}%`;
+    const remaining = Math.max(turns.length - index, 0);
+    if (quizRemaining) quizRemaining.textContent = String(remaining);
+    if (quizRemainingDesktop) quizRemainingDesktop.textContent = String(remaining);
   }
 
   function makePastTurn(turn) {
@@ -921,7 +958,10 @@ function initializeQuiz() {
       turn.role === myRole && !direction,
     );
     roleName.hidden = direction;
-    roleName.textContent = turn.role;
+    roleName.textContent =
+      turn.role === myRole && !direction
+        ? `${turn.role} · 내 대사`
+        : turn.role;
     scrollCurrentTurnIntoView();
 
     if (direction) {
@@ -959,6 +999,7 @@ function initializeQuiz() {
       finishTracked = true;
       trackMetric("quiz_finish");
     }
+    stopSessionClock();
 
     const summary = summarizeVoiceAttempts(state.voiceAttempts);
     summaryMetrics.replaceChildren();
@@ -970,15 +1011,12 @@ function initializeQuiz() {
       const fragment = document.createDocumentFragment();
       for (const [label, value] of metrics) {
         const card = document.createElement("article");
-        card.className =
-          "rounded-lg border border-line bg-surface p-md shadow-card";
+        card.className = "summary-card";
         const valueElement = document.createElement("p");
-        valueElement.className =
-          "m-0 text-h1 font-bold text-primary-strong";
+        valueElement.className = "summary-value";
         valueElement.textContent = `${value}%`;
         const labelElement = document.createElement("p");
-        labelElement.className =
-          "mb-0 mt-xs text-[13px] font-medium text-ink-sub";
+        labelElement.className = "summary-label";
         labelElement.textContent = label;
         card.append(valueElement, labelElement);
         fragment.append(card);
@@ -999,8 +1037,7 @@ function initializeQuiz() {
       const turn = turns[index];
       const item = document.createElement("button");
       item.type = "button";
-      item.className =
-        "w-full rounded-lg bg-surface p-md text-left shadow-card active:bg-surface-sub";
+      item.className = "review-item";
       item.dataset.reviewIndex = String(index);
       const name = document.createElement("p");
       name.className = "m-0 text-label text-primary-strong";
@@ -1090,12 +1127,14 @@ function initializeQuiz() {
   });
   document.getElementById("exitButton").addEventListener("click", () => {
     sessionActive = false;
+    stopSessionClock();
     stopRecognition();
     clearTurnTimers();
     window.location.href = "/input";
   });
   window.addEventListener("pagehide", () => {
     sessionActive = false;
+    stopSessionClock();
     stopRecognition();
     clearTurnTimers();
   }, { once: true });
@@ -1103,6 +1142,7 @@ function initializeQuiz() {
     if (event.persisted) window.location.reload();
   });
 
+  scheduleSessionClock();
   voiceModeInput.checked = state.voiceMode;
   silentModeInput.checked = !state.voiceMode;
   if (inAppBrowser) {

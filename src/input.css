@@ -1,102 +1,1194 @@
-/* source(none)으로 자동 탐지를 끄고 실제 페이지만 스캔한다. 이게 없으면 Tailwind가
-   저장소 전체를 훑어 README·AGENTS의 클래스처럼 보이는 문자열까지 CSS로 만들어낸다. */
 @import "tailwindcss" source(none);
 @source "../index.html";
 @source "../input/index.html";
 @source "../char/index.html";
 @source "../prac/index.html";
 @source "../quiz/index.html";
+@source "../privacy.html";
 @source "../app/*.js";
 
-/* ── brand/ 생성물 ────────────────────────────────────────────────────
-   tools/subproject-sync-brand.py가 넣는다. src/brand/ 안의 파일을 직접 고치지 않는다 —
-   값을 바꾸려면 brand/DESIGN.md를 고치고 다시 생성한 뒤 동기화한다.
-
-   tailwind-starter.css = 색·타이포·radius·spacing 토큰 + 티어 경계(tablet 600 / desktop 1024).
-   responsive-base.css  = 3단 티어 셸(.tier-root/.tier-shell) + 기기 하드닝.
-                          safe-area, 44px 탭 타겟, keep-all, reduced-motion이 여기서 온다. */
 @import "./brand/tailwind-starter.css";
 @import "./brand/responsive-base.css";
 
-/* ── 이 프로젝트에만 있는 것 ──────────────────────────────────────────
-
-   대본 본문 글꼴: 사용자가 넣는 대본은 글자가 임의라 서브셋 폰트로 감당할 수 없다.
-   (다른 서브프로젝트는 문구가 고정이라 build-fonts.py로 쓰인 글자만 굽는다.)
-   그래서 UI는 Pretendard 서브셋, 대본 본문만 시스템 한글 글꼴로 떨어뜨린다.
-   섞이는 게 아니라 "원고는 원고 글꼴"이라는 의도된 구분이다. */
+/* 리디자인 빌드스펙의 화면 토큰. 생성물인 brand/는 수정하지 않는다. */
 @theme {
+  --color-canvas: #f2f4f6;
+  --color-white: #ffffff;
+  --color-ink-soft: #4e5968;
+  --color-ink-muted: #8b95a1;
+  --color-line-strong: #d1d6db;
+  --color-primary-soft: #eaf3ff;
+  --color-primary-deep: #005fcc;
+  --color-primary-pressed: #005fcc;
+  --color-session: #141b24;
+  --color-session-soft: #252d38;
+  --color-success: #00a661;
+  --color-warning: #f5a623;
+  --font-sans: "Noto Sans KR", "Apple SD Gothic Neo", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-script: "Apple SD Gothic Neo", "Noto Sans KR", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --radius-xl: 24px;
+  --radius-card: 24px;
 }
 
-/* ── /quiz · 화면이 곧 대본인 스크롤 문서 ───────────────────────────── */
-#progressBar {
-  width: 0;
-  border-radius: 0 2px 2px 0;
-  transition: width 180ms ease-out;
+[hidden] {
+  display: none !important;
 }
 
-#quizRoot {
-  min-height: calc(var(--app-min-h) - 3px);
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
 }
 
-#quizMain {
-  scroll-padding-bottom: calc(var(--spacing-xxl) * 2);
+body {
+  min-width: 320px;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  border: 0;
+}
+
+.app-page {
+  --content-max: 1328px;
+  background: var(--color-canvas);
+}
+
+.desktop-header {
+  display: none;
+  position: relative;
+  z-index: 20;
+  height: 76px;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-white);
+  color: var(--color-ink);
+}
+
+.desktop-header-inner {
+  width: min(100%, 1440px);
+  height: 100%;
+  margin-inline: auto;
+  padding-inline: 40px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 32px;
+}
+
+.brand-lockup {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-ink);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.brand-mark {
+  display: inline-block;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  background: var(--color-primary);
+}
+
+.desktop-nav {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.desktop-nav a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-ink-soft);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.desktop-nav a.is-active {
+  color: var(--color-primary);
+}
+
+.desktop-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.button-primary,
+.button-secondary {
+  min-height: 48px;
+  padding-inline: 20px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.button-primary {
+  background: var(--color-primary);
+  color: white;
+}
+
+.button-primary:active {
+  background: var(--color-primary-pressed);
+}
+
+.button-primary:disabled {
+  background: var(--color-line-strong);
+  color: var(--color-white);
+  cursor: not-allowed;
+}
+
+.button-secondary {
+  border: 1px solid var(--color-line);
+  background: var(--color-white);
+  color: var(--color-ink);
+}
+
+.button-large {
+  min-height: 56px;
+  padding-inline: 24px;
+}
+
+.button-text {
+  min-height: 44px;
+  padding: 0 4px;
+  background: transparent;
+  color: var(--color-ink-soft);
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.mobile-brand {
+  margin-bottom: 20px;
+}
+
+.mobile-tabs {
+  position: fixed;
+  z-index: 50;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  min-height: calc(76px + var(--safe-bottom));
+  padding: 8px 8px calc(8px + var(--safe-bottom));
+  border-top: 1px solid var(--color-line);
+  border-radius: 24px 24px 0 0;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 -8px 28px rgba(25, 31, 40, 0.05);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.mobile-tabs a {
+  min-width: 0;
+  min-height: 58px;
+  padding: 4px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--color-ink-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.mobile-tabs a.is-active {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.tab-icon {
+  font-size: 19px;
+  line-height: 1;
+}
+
+/* 홈 */
+.home-shell {
+  min-height: var(--app-min-h);
+  padding-top: 20px;
+  padding-bottom: calc(108px + var(--safe-bottom));
+}
+
+.home-hero {
+  display: grid;
+  gap: 24px;
+}
+
+.home-copy {
+  min-width: 0;
+}
+
+.hero-eyebrow,
+.summary-eyebrow {
+  margin: 0 0 20px;
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.home-copy h1 {
+  margin: 0;
+  font-size: clamp(34px, 10vw, 48px);
+  line-height: 1.18;
+  letter-spacing: -0.04em;
+}
+
+.hero-description {
+  margin: 20px 0 0;
+  color: var(--color-ink-soft);
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.home-actions {
+  margin-top: 24px;
+  display: grid;
+  gap: 8px;
+}
+
+.step-rail {
+  list-style: none;
+  margin: 20px 0 0;
+  padding: 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: var(--color-white);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.step-rail li {
+  min-width: 0;
+  flex: 1;
+  padding: 8px 4px;
+  border-radius: 999px;
+  color: var(--color-ink-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.step-rail li::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: var(--color-line-strong);
+  display: inline-block;
+}
+
+.step-rail li.is-done,
+.step-rail li.is-current {
+  color: var(--color-primary);
+}
+
+.step-rail li.is-current {
+  background: var(--color-primary-soft);
+}
+
+.step-rail li.is-done::before,
+.step-rail li.is-current::before {
+  background: var(--color-primary);
+}
+
+.hero-preview {
+  min-width: 0;
+  min-height: 385px;
+  padding: 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 24px;
+  background: var(--color-white);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 14px 40px rgba(25, 31, 40, 0.07);
+}
+
+.preview-heading {
+  padding: 0 4px 8px;
+  display: flex;
+  justify-content: space-between;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.preview-time,
+.time-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.preview-time {
+  color: var(--color-ink-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.preview-turn {
+  min-height: 76px;
+  padding: 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  background: var(--color-white);
+}
+
+.preview-turn.is-past {
+  opacity: 0.58;
+}
+
+.preview-turn.is-mine {
+  min-height: 112px;
+  border-color: transparent;
+  background: var(--color-primary-soft);
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.preview-label {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--color-ink-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.is-mine .preview-label {
+  color: var(--color-primary);
+}
+
+.preview-line {
+  display: block;
+  width: 88%;
+  height: 10px;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: var(--color-line-strong);
+}
+
+.is-mine .preview-line {
+  height: 12px;
+  background: color-mix(in srgb, var(--color-primary) 23%, white);
+}
+
+.preview-line.short {
+  width: 62%;
+}
+
+.home-features {
+  margin-top: 48px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.home-features article {
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  background: var(--color-white);
+}
+
+.home-features h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.home-features p {
+  margin: 8px 0 0;
+  color: var(--color-ink-soft);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/* 대본 / 배역 */
+.script-shell {
+  min-height: var(--app-min-h);
+  padding-top: 20px;
+  padding-bottom: calc(112px + var(--safe-bottom));
+}
+
+.page-intro {
+  margin-bottom: 20px;
+}
+
+.page-intro h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.3;
+  letter-spacing: -0.025em;
+}
+
+.page-intro p {
+  margin: 8px 0 0;
+  color: var(--color-ink-soft);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.page-intro .step-rail {
+  margin-top: 16px;
+}
+
+.script-workspace,
+.char-workspace {
+  display: grid;
+  gap: 16px;
+}
+
+.workspace-card {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--color-line);
+  border-radius: 24px;
+  background: var(--color-white);
+}
+
+.card-heading {
+  margin-bottom: 16px;
+}
+
+.card-heading h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+.card-heading p {
+  margin: 8px 0 0;
+  color: var(--color-ink-soft);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.input-methods {
+  display: grid;
+  gap: 8px;
+}
+
+.drop-action,
+.method-action {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 16px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.drop-action {
+  min-height: 118px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.drop-action strong,
+.method-action strong {
+  font-size: 15px;
+}
+
+.drop-action span:last-child,
+.method-action span {
+  color: var(--color-ink-muted);
+  font-size: 12px;
+}
+
+.upload-icon {
+  color: var(--color-primary) !important;
+  font-size: 28px !important;
+  line-height: 1;
+}
+
+.method-action {
+  min-height: 70px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  text-align: left;
+}
+
+.input-toolbar {
+  min-height: 44px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.script-textarea {
+  width: 100%;
+  min-height: 300px;
+  max-height: 52svh;
+  padding: 16px;
+  resize: vertical;
+  overflow-y: auto;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-script);
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.script-textarea:focus,
+.manual-role-field input:focus {
+  border-color: var(--color-primary);
+  outline: 2px solid color-mix(in srgb, var(--color-primary) 22%, transparent);
+}
+
+.role-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.role-preview-list {
+  display: grid;
+  gap: 8px;
+}
+
+.role-preview-item {
+  min-height: 70px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.role-preview-item > span:last-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.role-preview-item strong {
+  color: var(--color-ink);
+  font-size: 15px;
+}
+
+.role-preview-item small {
+  margin-top: 4px;
+  color: var(--color-ink-muted);
+  font-size: 12px;
+}
+
+.role-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.role-empty-copy {
+  min-height: 180px;
+  padding: 24px;
+  border: 1px dashed var(--color-line-strong);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-ink-muted);
+  text-align: center;
+}
+
+.role-card:has(#roleChips:not([hidden])) .role-empty-copy {
+  display: none;
+}
+
+.role-empty-icon {
+  font-size: 28px;
+}
+
+.role-empty-copy p {
+  max-width: 220px;
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.manual-role-field {
+  margin-top: 16px;
+}
+
+.manual-role-field label {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--color-ink-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.manual-role-field input {
+  width: 100%;
+  min-height: 48px;
+  padding-inline: 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+.privacy-footnote {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--color-ink-muted);
+  font-size: 12px;
+}
+
+.privacy-footnote p {
+  margin: 0;
+}
+
+.privacy-footnote a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: underline;
+}
+
+.char-shell {
+  padding-bottom: calc(164px + var(--safe-bottom));
+}
+
+.char-workspace {
+  align-items: start;
+}
+
+.role-selection-card,
+.reading-config-card {
+  min-width: 0;
+}
+
+#includedRolesList {
+  grid-template-columns: 1fr;
+}
+
+.role-picker {
+  min-height: 76px;
+  padding: 16px !important;
+}
+
+.role-picker > span:first-of-type {
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+.role-picker:has(.role-picker-input:checked) > span:first-of-type {
+  border: 2px solid var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.role-picker:has(.role-picker-input:checked) .role-avatar {
+  background: var(--color-primary);
+  color: white;
+}
+
+.mode-picker label {
+  min-width: 0;
+  min-height: 64px;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+.mode-picker label:has(input:checked) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.reading-config-card #readingSettings {
+  border: 1px solid var(--color-line);
+  box-shadow: none;
+}
+
+.char-action-bar {
+  position: fixed;
+  z-index: 40;
+  right: 0;
+  bottom: calc(76px + var(--safe-bottom));
+  left: 0;
+  padding: 8px 20px;
+  background: linear-gradient(to bottom, transparent, var(--color-canvas) 22%);
+}
+
+.char-action-bar #startButton {
+  display: flex;
+  max-width: 560px;
+  margin-inline: auto;
+}
+
+/* 리딩 공통 프레임 */
+.session-page {
+  --content-max: 1400px;
+  min-height: var(--app-min-h);
+  background: var(--color-session);
+  color: white;
+}
+
+.reading-shell,
+.quiz-shell {
+  min-height: var(--app-min-h);
+  padding-top: 0;
+  padding-bottom: calc(168px + var(--safe-bottom));
+  display: flex;
+  flex-direction: column;
+}
+
+.session-header {
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.session-header > div:first-child {
+  min-width: 0;
+}
+
+.session-exit {
+  min-height: 30px;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  color: #a9b2bf;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.session-header h1,
+.session-title-line {
+  margin: 4px 0 0;
+  color: white;
+  font-size: 20px;
+  font-weight: 750;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+}
+
+.session-header-status {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.session-header-status > span {
+  min-width: 68px;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--color-session-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.session-header-status strong {
+  color: white;
+  font-size: 13px;
+}
+
+.session-header-status small {
+  margin-top: 4px;
+  color: #8f9aa8;
+  font-size: 9px;
+}
+
+.session-layout {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.session-document {
+  min-width: 0;
+  height: min(56svh, 570px);
+  padding: 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 24px;
+  background: #f7f9fb;
+  color: var(--color-ink);
+  scrollbar-width: thin;
+}
+
+.reading-context-turn,
+.quiz-turn {
+  min-width: 0;
+  margin-bottom: 12px;
+  padding: 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  background: white;
+}
+
+.reading-context-turn {
+  opacity: 0.52;
+}
+
+.reading-context-turn p,
+.reading-current-turn p {
+  margin: 0;
+}
+
+.reading-context-turn p:first-child,
+#currentRoleName,
+.quiz-turn-role {
+  margin-bottom: 8px;
+  color: var(--color-ink-soft);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.reading-context-turn p:last-child {
+  color: var(--color-ink-soft);
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.reading-current-turn {
+  position: relative;
+  min-width: 0;
+  padding: 16px 20px;
+  border-radius: 16px;
+  color: var(--color-ink);
+  box-shadow: inset 3px 0 0 transparent;
+}
+
+.reading-current-turn.bg-primary-soft {
+  background: var(--color-primary-soft);
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.reading-current-turn.bg-primary-soft #currentRoleName {
+  color: var(--color-primary);
+}
+
+#currentLineText {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 750;
+  line-height: 1.55;
+  text-align: left;
+}
+
+#currentLineText.is-direction {
+  color: var(--color-ink-muted);
+  font-size: 15px;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.reading-next-turn {
+  margin-top: 12px;
+}
+
+.reading-next-turn .reading-context-turn {
+  opacity: 0.38;
+}
+
+.session-status-panel {
+  min-width: 0;
+  padding: 24px;
+  border-radius: 24px;
+  background: var(--color-session-soft);
+  align-self: center;
+}
+
+.session-status-panel h2 {
+  margin: 0 0 16px;
+  color: white;
+  font-size: 14px;
+}
+
+.status-card {
+  min-height: 94px;
+  margin-top: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.status-card strong {
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 26px;
+}
+
+.status-card span {
+  margin-top: 4px;
+  color: var(--color-ink-muted);
+  font-size: 12px;
+}
+
+.session-feedback {
+  min-width: 0;
+}
+
+.session-feedback p,
+#modeError {
+  margin: 0;
+  color: #ff9da5;
+  font-size: 12px;
+}
+
+.session-controls {
+  position: fixed;
+  z-index: 45;
+  right: 18px;
+  bottom: calc(82px + var(--safe-bottom));
+  left: 18px;
+  padding-top: 8px;
+  background: var(--color-session);
+}
+
+.session-control-buttons {
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+}
+
+.session-control-primary,
+.session-control-secondary,
+.session-control-link {
+  min-width: 0;
+  min-height: 50px;
+  flex: 1 1 0;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.session-control-primary {
+  background: var(--color-primary);
+  color: white;
+}
+
+.session-control-secondary,
+.session-control-link {
+  background: #343d49;
+  color: white;
+}
+
+.session-control-primary:disabled,
+.session-control-secondary:disabled {
+  background: #252d38;
+  color: #6f7a88;
+  cursor: not-allowed;
+}
+
+.session-control-link {
+  max-width: 58px;
+  flex-basis: 58px;
+}
+
+.session-controls > p {
+  margin: 8px 0 0;
+  color: #8f9aa8;
+  font-size: 11px;
+  text-align: center;
+}
+
+.session-tabs {
+  border-top-color: #3a4350;
+  background: #2b333e;
+  box-shadow: none;
+}
+
+.session-tabs a {
+  color: #9ca7b5;
+}
+
+.session-tabs a.is-active {
+  background: #4a535f;
+  color: var(--color-primary);
+}
+
+/* 암기 모드 */
+.quiz-session-header {
+  align-items: center;
+}
+
+.quiz-header-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quiz-mode-controls {
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--color-session-soft);
+  display: flex;
+}
+
+.quiz-mode-controls label {
+  position: relative;
+  min-width: 58px;
+  min-height: 42px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a9b2bf;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.quiz-mode-controls input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  appearance: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.quiz-mode-controls label:has(input:checked) {
+  background: white;
+  color: var(--color-primary);
+}
+
+.quiz-disclosures {
+  min-height: 0;
+  margin: 0 0 8px;
+}
+
+.quiz-disclosures p {
+  margin: 4px 0 0;
+  color: #9ca7b5;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.quiz-main {
+  min-height: 0;
+  flex: 1;
+}
+
+.quiz-stage {
+  min-height: 0;
+}
+
+.quiz-document {
+  scroll-padding-bottom: 120px;
 }
 
 .quiz-turn {
-  margin-bottom: 22px;
+  color: var(--color-ink);
 }
 
 .quiz-turn-role {
-  margin: 0 0 5px;
-  color: var(--color-ink-tertiary);
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.5;
+  margin-top: 0;
 }
 
 .quiz-turn-text {
   margin: 0;
-  color: var(--color-ink-sub);
+  color: var(--color-ink-soft);
   font-family: var(--font-script);
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1.65;
   word-break: keep-all;
 }
 
 .quiz-turn-past {
-  opacity: 0.62;
+  opacity: 0.5;
 }
 
 .quiz-turn-me .quiz-turn-role {
-  color: var(--color-primary-strong);
+  color: var(--color-primary);
 }
 
 .quiz-turn-current {
   position: relative;
-  padding-left: 14px;
-  scroll-margin-block-end: calc(var(--spacing-xxl) * 2);
+  scroll-margin-block-end: 120px;
 }
 
-.quiz-turn-current::before {
-  position: absolute;
-  top: 2px;
-  bottom: 2px;
-  left: 0;
-  width: 3px;
-  border-radius: 2px;
-  background: var(--color-primary);
-  content: "";
+.quiz-turn-current.quiz-turn-me {
+  border-color: transparent;
+  background: var(--color-primary-soft);
+  box-shadow: inset 3px 0 0 var(--color-primary);
 }
 
 .quiz-turn-current .quiz-turn-text {
   color: var(--color-ink);
-  font-weight: 600;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.55;
 }
 
 .quiz-turn-direction .quiz-turn-text {
-  color: var(--color-ink-sub);
-  font-size: var(--text-body-lg);
+  color: var(--color-ink-muted);
+  font-size: 15px;
   font-weight: 500;
   line-height: 1.6;
 }
@@ -104,182 +1196,533 @@
 .quiz-word-veil {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 8px;
 }
 
 .quiz-word-mask {
   display: inline-block;
-  flex: 0 0 auto;
-  /* 공백 없는 긴 외침("아아아…!")이 글줄보다 넓어지면 가로 스크롤이 생긴다 —
-     블록은 못 접으므로 폭만 글줄에 맞춰 자른다. 글자 수 단서는 이미 근사값이다. */
   max-width: 100%;
   width: calc(var(--quiz-mask-characters) * 0.9em + 20px);
   height: 26px;
-  border: 1px solid var(--color-line);
-  border-radius: 7px;
-  background: var(--color-neutral);
+  flex: 0 0 auto;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 8px;
+  background: white;
 }
 
 .quiz-word-hint {
   align-self: center;
   color: var(--color-ink);
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 26px;
 }
 
-/* ── 넓은 화면에서 폰 레이아웃이 새는 것을 막는다 ───────────────────────
-   화면 4개가 전부 `header / main.flex-1 / footer` 골격이다. 폰에서는 이게 맞다 —
-   콘텐츠는 위, 조작은 엄지가 닿는 화면 바닥. 그런데 뷰포트가 커지면 `flex-1`이
-   그 사이를 통째로 벌려서, 1440×900에서 대사 카드와 버튼 사이가 470px 빈다.
+.different-words {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
 
-   DESIGN.md `## Layout`: "폭을 늘리는 게 아니라 여백·글자 크기를 한 단 키우고
-   남는 자리를 배경이 받게 한다." 셸 폭(desktop 760px)은 정본이라 손대지 않는다.
+.future-marker {
+  margin: 0;
+  padding-top: 4px;
+  color: var(--color-line-strong);
+  font-size: 12px;
+  text-align: center;
+}
 
-   ⚠️ 폭만 보고 걸면 안 된다. 가로로 누운 폰(844×390)도 tablet 티어라, 폭 조건만
-   쓰면 화면에 다 들어가지도 않는데 하단 고정만 풀리는 최악이 된다. 높이를 같이 본다.
-   ⚠️ 세로 가운데 정렬은 쓰지 않았다. /quiz·/prac은 줄마다 카드 높이가 달라져서
-   가운데로 모으면 매 턴 헤더가 위아래로 움직인다 — DESIGN.md "원래 있던 UI를
-   화면 전환 때 움직이기"에 걸린다. 위를 고정하고 남는 자리를 아래 배경이 받게 한다. */
-@media (min-width: 600px) and (min-height: 700px) {
-  /* ① 하단 고정을 푼다 — 조작이 콘텐츠 바로 아래로 온다. 구멍이 사라진다. */
-  .tier-shell > main {
-    flex: 0 0 auto;
+.quiz-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.quiz-actions .session-control-buttons {
+  width: 100%;
+}
+
+.secondary-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.secondary-controls button {
+  min-height: 44px;
+  border-radius: 12px;
+  background: #343d49;
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.empty-dialogue-card {
+  max-width: 520px;
+  margin: 48px auto;
+  padding: 24px;
+  border-radius: 24px;
+  background: white;
+  color: var(--color-ink);
+}
+
+.empty-dialogue-card p {
+  margin: 0 0 20px;
+  font-size: 22px;
+  font-weight: 750;
+}
+
+/* 완주 요약 */
+.summary-header {
+  display: none !important;
+}
+
+.completion-panel {
+  color: var(--color-ink);
+}
+
+.reading-complete {
+  --content-max: 1328px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+.reading-complete .reading-shell {
+  padding-top: 24px;
+  padding-bottom: calc(108px + var(--safe-bottom));
+}
+
+.reading-complete .session-header,
+.reading-complete #readingStage,
+.reading-complete .session-controls {
+  display: none;
+}
+
+.completion-heading {
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+}
+
+.completion-heading .summary-eyebrow {
+  margin-bottom: 8px;
+}
+
+.completion-heading h1 {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 30px;
+  line-height: 1.3;
+  letter-spacing: -0.03em;
+}
+
+.completion-heading p:not(.summary-eyebrow) {
+  margin: 8px 0 0;
+  color: var(--color-ink-soft);
+  font-size: 14px;
+}
+
+.completion-core-card,
+.completion-core-link {
+  padding: 24px;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  background: white;
+}
+
+.completion-core-card p {
+  margin: 0;
+  color: var(--color-ink-soft);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.completion-core-card a {
+  min-height: 44px;
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-primary);
+  font-weight: 750;
+}
+
+#quizRoot:has(#completionState:not([hidden])) {
+  --content-max: 1328px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+#quizRoot:has(#completionState:not([hidden])) .quiz-shell {
+  padding-top: 24px;
+  padding-bottom: calc(108px + var(--safe-bottom));
+}
+
+#quizRoot:has(#completionState:not([hidden])) .quiz-session-header,
+#quizRoot:has(#completionState:not([hidden])) .quiz-disclosures,
+#quizRoot:has(#completionState:not([hidden])) .quiz-actions {
+  display: none !important;
+}
+
+.quiz-completion {
+  width: 100%;
+}
+
+.summary-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.summary-card {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  background: white;
+}
+
+.summary-value {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.summary-label {
+  margin: 8px 0 0;
+  color: var(--color-ink-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.review-section {
+  margin-top: 24px;
+  padding: 24px;
+  border: 1px solid var(--color-line);
+  border-radius: 24px;
+  background: white;
+}
+
+.review-section h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.review-list {
+  margin-top: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.review-item {
+  width: 100%;
+  padding: 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  text-align: left;
+}
+
+.text-boundary {
+  margin: 24px 0 8px;
+  color: var(--color-ink-soft);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.completion-core-link {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 750;
+  text-align: center;
+}
+
+.reading-complete ~ .mobile-tabs,
+#quizRoot:has(#completionState:not([hidden])) ~ .mobile-tabs {
+  border-top-color: var(--color-line);
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.reading-complete ~ .mobile-tabs a,
+#quizRoot:has(#completionState:not([hidden])) ~ .mobile-tabs a {
+  color: var(--color-ink-muted);
+}
+
+.reading-complete ~ .mobile-tabs .reading-tab,
+#quizRoot:has(#completionState:not([hidden])) ~ .mobile-tabs .reading-tab {
+  background: transparent;
+  color: var(--color-ink-muted);
+}
+
+.reading-complete ~ .mobile-tabs .summary-tab,
+#quizRoot:has(#completionState:not([hidden])) ~ .mobile-tabs .summary-tab {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+@media (max-width: 1023.98px) {
+  .mobile-tabs {
+    display: grid !important;
   }
 
-  .tier-shell > footer {
-    margin-top: 0;
+  .quiz-session-header {
+    padding-block: 8px;
+    flex-wrap: wrap;
   }
 
-  /* sticky는 폰에서 CTA를 화면 안에 붙들어두는 장치다. 화면이 넓고 높으면
-     그럴 이유가 없고, 붙어 있으면 그게 곧 구멍의 아래쪽 벽이 된다. */
-  .tier-shell > footer.tier-sticky-bottom {
-    position: static;
-    /* sticky일 때의 위 여백(spacing-sm)은 "떠 있는 바와 콘텐츠 사이"용이라 8px다.
-       고정이 풀리면 그냥 붙어버리므로 섹션 간격으로 돌려놓는다. */
-    padding-top: var(--spacing-lg);
-    padding-bottom: 0;
-    background: none;
-  }
-
-  /* ② 주요 버튼을 셸 전체 폭으로 늘리지 않는다. 680px 파란 띠는 광고 배너로 읽힌다.
-     상한은 새로 지어낸 치수가 아니라 폰에서의 버튼 폭이다(375 − 좌우 20×2 = 335px
-     → 21rem = 336px. rem으로 두면 사용자가 글자를 키웠을 때 버튼도 같이 큰다).
-     #actionSlot은 /prac — 그 화면 마크업은 이번 작업에서 못 건드려서 id로 잡는다.
-     구조 선택자 두 줄은 /prac 커밋본용이다(디스크본과 마크업이 다르다): 푸터의 첫
-     자식이 버튼 줄이고, 그 아래 안내문(p)이 가운데 정렬이라 버튼만 좁히면 안내문
-     혼자 셸 한가운데에 남아 따로 논다. */
-  .wide-action,
-  #actionSlot,
-  #readingSurface > .tier-shell > footer > div:first-child,
-  #readingSurface > .tier-shell > footer > p {
-    max-width: 21rem;
+  .quiz-header-tools {
+    width: 100%;
+    justify-content: space-between;
   }
 }
 
-@media (min-width: 1024px) and (min-height: 700px) {
-  /* ③ 여백을 한 단 키운다. 값은 spacing 토큰에서만 가져온다
-     (DESIGN.md `## Layout`: 섹션 사이는 40~64). */
-  .tier-shell {
-    padding-top: var(--spacing-xxl);
+@media (min-width: 600px) {
+  .home-shell,
+  .script-shell {
+    padding-top: 32px;
   }
 
-  /* 두 벌로 적는 이유: sticky 쪽이 클래스를 하나 더 달고 있어 더 구체적이다. */
-  .tier-shell > footer,
-  .tier-shell > footer.tier-sticky-bottom {
-    padding-top: var(--spacing-xl);
+  .home-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  /* ④ /prac 대사 카드는 680px 왼쪽 구석에 한 줄만 찍히지 않도록 글자와
-     안쪽 여백을 한 단 키운다. /quiz는 카드가 아닌 대본 문서라 위 전용 규칙을 쓴다. */
-  #currentLineCard {
-    padding: var(--spacing-xl) var(--spacing-lg);
+  .script-workspace,
+  .char-workspace {
+    gap: 20px;
   }
 
-  /* 지문(isDirection)은 font-normal·font-medium이라 여기 안 걸린다 — 대사만 키운다.
-     /prac의 굵기가 바뀌면 카드만 커지고 글자는 남지 않도록 여기도 같이 본다. */
-  #currentLineText.font-semibold,
-  #currentLineText.font-bold {
-    font-size: var(--text-h1);
+  .workspace-card {
+    padding: 24px;
+  }
+
+  #includedRolesList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .completion-heading {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
   }
 }
 
-/* ── 데스크톱 배치는 화면마다 따로 짠다 ────────────────────────────────
-   위 블록까지는 "한 열 그대로, 여백·글자만 한 단"이었다. 그걸로는 폰 컴포넌트가
-   가로로 늘어난 모양이 남는다 — 680px 막대 안에 글자는 왼쪽 구석에만 있고,
-   가려진 대사 24점은 한 줄로 퍼져 구분선처럼 보였다.
-
-   그래서 넓은 화면에서는 배치 자체를 바꾼다. 셸 폭(desktop 760px)은 그대로 둔다 —
-   재보니 680px 콘텐츠 폭이 필요한 배치를 전부 담는다(입력 방법 3열, 조작 3개 가로).
-   폭을 더 늘리면 얻는 건 없고 30px 대사의 글줄만 길어진다.
-
-   여기 있는 규칙은 전부 min-width:1024px 안에 있다 — 폰(390px) 픽셀은 안 건드린다. */
 @media (min-width: 1024px) {
-  /* ── /input · 대본 넣는 방법 3개를 가로로 ────────────────────────────
-     세로로 쌓으면 680×72 막대 셋이 된다. 가로로 놓으면 216px 타일 셋이라
-     "고르는 것"으로 읽힌다. `.grid`로 좁힌 이유: /quiz에도 #emptyState가
-     있는데(대사 없음 안내) 그건 grid가 아니라 여기 걸리면 안 된다. */
-  #emptyState.grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    /* 행 간격을 0으로 두는 이유: 아래 예시 블록이 같은 그리드의 두 번째 행이라
-       row-gap이 그 블록의 mt-xl(40px)에 더해져 토큰에 없는 값이 된다. */
-    row-gap: 0;
-    column-gap: var(--spacing-md);
+  .desktop-header {
+    display: block;
   }
 
-  #emptyState.grid > button {
-    flex-direction: column;
+  .mobile-tabs {
+    display: none !important;
+  }
+
+  .mobile-brand {
+    display: none;
+  }
+
+  .home-shell {
+    min-height: calc(var(--app-min-h) - 76px);
+    padding-top: 72px;
+    padding-bottom: 64px;
+  }
+
+  .home-hero {
+    grid-template-columns: minmax(0, 0.9fr) minmax(520px, 1.1fr);
+    align-items: center;
+    gap: 72px;
+  }
+
+  .home-copy h1 {
+    font-size: 52px;
+  }
+
+  .hero-description {
+    max-width: 520px;
+    font-size: 17px;
+  }
+
+  .home-actions {
+    width: fit-content;
+    grid-template-columns: auto auto;
+  }
+
+  .step-rail {
+    max-width: 470px;
+  }
+
+  .hero-preview {
+    min-height: 520px;
+    padding: 28px;
+    gap: 16px;
+  }
+
+  .preview-turn {
+    min-height: 92px;
+    padding: 16px;
+  }
+
+  .preview-turn.is-mine {
+    min-height: 124px;
+  }
+
+  .script-shell {
+    min-height: calc(var(--app-min-h) - 76px);
+    padding-top: 48px;
+    padding-bottom: 48px;
+  }
+
+  .page-intro {
+    margin-bottom: 24px;
+    display: flex;
     align-items: flex-start;
-    justify-content: flex-start;
-    /* 타일 높이도 지어내지 않는다 — 간격 토큰의 배수. 셋 중 하나(직접 쓰기)는
-       설명 줄이 없어서, 높이를 안 주면 제목만 붙은 얇은 타일이 된다. */
-    min-height: calc(var(--spacing-xxl) + var(--spacing-xl));
-    padding: var(--spacing-lg);
+    justify-content: space-between;
+    gap: 40px;
   }
 
-  /* 예시("이런 모양이면 돼요")는 타일이 아니라 그 아래 한 줄이다. */
-  #emptyState.grid > div {
+  .page-intro h1 {
+    font-size: 32px;
+  }
+
+  .page-intro .step-rail {
+    width: 360px;
+    margin-top: 4px;
+  }
+
+  .script-workspace {
+    grid-template-columns: minmax(0, 2.15fr) minmax(320px, 0.95fr);
+    align-items: stretch;
+  }
+
+  .input-card,
+  .role-card {
+    min-height: 620px;
+  }
+
+  .input-methods {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .drop-action {
+    min-height: 138px;
     grid-column: 1 / -1;
   }
 
-  /* ── /char · 배역 타일 3열 ──────────────────────────────────────────
-     2열이면 타일 하나가 336px인데 안에는 이름과 "대사 N줄"뿐이다.
-     모드 선택도 같은 3열 리듬에 얹어 배역 타일과 같은 폭으로 맞춘다. */
-  #includedRolesList,
-  #rolesList > fieldset {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .script-textarea {
+    min-height: 470px;
   }
 
-  /* ── /quiz · 조작은 대사 아래 가로로 ────────────────────────────────
-     세로로 쌓으면 대사 카드 아래에 버튼 기둥이 서고 화면 아래가 통째로 빈다.
-     `:not([hidden])`이 필요하다 — id 선택자가 [hidden]의 display:none을 이긴다. */
-  #actionArea:not([hidden]) {
+  .char-shell {
+    padding-bottom: 120px;
+  }
+
+  .char-workspace {
+    grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.8fr);
+  }
+
+  .role-selection-card,
+  .reading-config-card {
+    min-height: 620px;
+  }
+
+  .char-action-bar {
+    position: static;
+    grid-column: 1 / -1;
+    padding: 24px 0 0;
+    background: transparent;
+  }
+
+  .char-action-bar #startButton {
+    margin-left: auto;
+    margin-right: 0;
+  }
+
+  .reading-shell,
+  .quiz-shell {
+    min-height: var(--app-min-h);
+    padding: 0 40px 32px;
+  }
+
+  .session-layout {
+    grid-template-columns: minmax(0, 1fr) 280px;
+    align-items: center;
+    gap: 32px;
+  }
+
+  .session-document {
+    height: min(58svh, 590px);
+    padding: 32px;
+  }
+
+  .reading-current-turn {
+    padding: 20px 24px;
+  }
+
+  #currentLineText,
+  .quiz-turn-current .quiz-turn-text {
+    font-size: 20px;
+  }
+
+  .session-feedback {
+    grid-column: 1;
+  }
+
+  .session-controls {
+    position: static;
+    width: min(100%, 880px);
+    margin: 20px auto 0;
+    padding-top: 0;
+    background: transparent;
+  }
+
+  .quiz-actions:not([hidden]) {
     display: flex;
     align-items: flex-start;
-    gap: var(--spacing-sm);
   }
 
-  /* 묶음 안에서도 가로로 — 폰에서는 세로로 쌓는 게 맞지만(엄지) 넓은 화면에서
-     336px 버튼이 세로로 두 개 쌓이면 그게 다시 기둥이 된다. */
-  #actionArea > div {
-    display: flex;
-    flex: 1 1 0;
-    gap: var(--spacing-sm);
-    margin-top: 0;
+  .quiz-actions .wide-action {
+    flex: 1;
   }
 
-  #actionArea > div > button {
-    flex: 1 1 0;
+  .secondary-controls {
+    margin-left: 8px;
   }
-}
 
-@media (min-width: 1024px) and (min-height: 700px) {
-  /* ── /prac · 대사가 주인공이면 카드가 무대여야 한다 ────────────────
-     카드가 대사 한 줄 높이라 화면 위쪽에 얇게 떠 있고 아래 절반이 비지 않게 한다.
-     높이를 간격 토큰의 배수로 고정하고(카드 위치가 매 턴 고정된다) 그 안에서
-     세로 가운데에 둔다. 헤더는 카드 위에 있으므로 줄 길이가 바뀌어도 안 움직인다. */
-  #currentLineCard {
-    min-height: calc(var(--spacing-xxl) * 4);
-    justify-content: center;
+  body:has(.reading-complete) .summary-header,
+  body:has(#completionState:not([hidden])) .summary-header {
+    display: block !important;
+  }
+
+  .reading-complete,
+  #quizRoot:has(#completionState:not([hidden])) {
+    min-height: calc(var(--app-min-h) - 76px);
+  }
+
+  .reading-complete .reading-shell,
+  #quizRoot:has(#completionState:not([hidden])) .quiz-shell {
+    min-height: calc(var(--app-min-h) - 76px);
+    padding-top: 48px;
+  }
+
+  .completion-heading h1 {
+    font-size: 34px;
+  }
+
+  .summary-metrics {
+    max-width: 850px;
+  }
+
+  .summary-card {
+    padding: 24px;
+  }
+
+  .review-section {
+    max-width: 850px;
   }
 }

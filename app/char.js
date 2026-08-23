@@ -141,7 +141,15 @@ function initializeCharacterPage(scriptText) {
 
     const picker = createRolePickerInput(role);
     const copy = document.createElement("span");
-    copy.className = "relative block min-w-0";
+    copy.className = "relative flex min-w-0 items-center gap-md";
+
+    const avatar = document.createElement("span");
+    avatar.className = "role-avatar shrink-0";
+    avatar.textContent = role.slice(0, 1);
+    avatar.setAttribute("aria-hidden", "true");
+
+    const roleCopy = document.createElement("span");
+    roleCopy.className = "min-w-0 flex-1";
 
     const nameRow = document.createElement("span");
     nameRow.className = "flex min-w-0 items-start justify-between gap-sm";
@@ -158,7 +166,8 @@ function initializeCharacterPage(scriptText) {
       "mt-xs block text-[13px] font-medium text-ink-sub";
     roleMeta.textContent = `대사 ${roleLineCounts.get(role)}줄`;
 
-    copy.append(nameRow, roleMeta);
+    roleCopy.append(nameRow, roleMeta);
+    copy.append(avatar, roleCopy);
     tile.append(surface, picker, copy);
 
     const elements = roleElements.get(role);

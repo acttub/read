@@ -36,10 +36,19 @@ function renderRoleChips(result) {
 
   for (const role of result.roles) {
     const lineCount = result.turns.filter((turn) => turn.role === role).length;
-    const chip = document.createElement("span");
-    chip.className =
-      "inline-flex min-h-11 items-center rounded-pill bg-primary-soft px-md text-body-sm font-semibold text-primary-strong";
-    chip.textContent = `${role} · ${lineCount}줄`;
+    const chip = document.createElement("div");
+    chip.className = "role-preview-item";
+    const avatar = document.createElement("span");
+    avatar.className = "role-avatar";
+    avatar.textContent = role.slice(0, 1);
+    avatar.setAttribute("aria-hidden", "true");
+    const copy = document.createElement("span");
+    const name = document.createElement("strong");
+    name.textContent = role;
+    const count = document.createElement("small");
+    count.textContent = `대사 ${lineCount}줄`;
+    copy.append(name, count);
+    chip.append(avatar, copy);
     roleChips.append(chip);
   }
 

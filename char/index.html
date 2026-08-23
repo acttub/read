@@ -181,22 +181,33 @@
       }
     </style>
   </head>
-  <body class="m-0 bg-neutral font-sans text-ink">
-    <div class="tier-root bg-neutral">
-      <div class="char-shell tier-shell flex min-h-[var(--app-min-h)] flex-col pt-md">
-        <header>
-          <div class="flex items-center justify-between gap-md">
-            <button id="backButton" type="button" class="bg-transparent p-0 text-[14px] font-medium text-ink-sub">← 대본 다시 붙여넣기</button>
-            <p class="m-0 shrink-0 text-[13px] font-medium tabular-nums text-ink-sub">2 / 3</p>
+  <body class="char-page m-0 bg-canvas font-sans text-ink">
+    <header class="desktop-header" data-tier-only="desktop">
+      <div class="desktop-header-inner">
+        <a class="brand-lockup" href="/" aria-label="acttub read 홈"><span class="brand-mark" aria-hidden="true"></span><span>acttub read</span></a>
+        <nav class="desktop-nav" aria-label="주요 단계">
+          <a href="/">홈</a><a class="is-active" href="/input" aria-current="step">대본</a><a href="/char">리딩</a><a href="/quiz#completionState">요약</a>
+        </nav>
+        <div class="desktop-actions"><a class="button-secondary" href="/input">새 대본</a><a class="button-primary" href="/char">바로 리딩</a></div>
+      </div>
+    </header>
+    <div class="tier-root app-page">
+      <div class="char-shell tier-shell script-shell">
+        <a class="brand-lockup mobile-brand" href="/" aria-label="acttub read 홈"><span class="brand-mark" aria-hidden="true"></span><span>acttub read</span></a>
+        <header class="page-intro">
+          <div>
+            <button id="backButton" type="button" class="button-text mb-sm">← 대본 다시 넣기</button>
+            <h1>대본과 배역</h1>
+            <p id="readingDescription">고른 배역은 기다리고, 나머지 배역을 소리로 읽어드려요.</p>
           </div>
-          <h1 class="m-0 text-h1">어느 배역이세요?</h1>
-          <p id="readingDescription" class="mb-0 mt-sm text-body-lg text-ink-sub">
-            고른 배역은 읽지 않고 기다릴게요.<br>
-            나머지 배역을 소리로 읽어드려요.
-          </p>
+          <ol class="step-rail" aria-label="리딩 준비 단계">
+            <li class="is-done">대본 넣기</li><li class="is-current">배역 정하기</li><li>바로 리딩</li>
+          </ol>
         </header>
 
-        <main id="rolesList" class="mt-lg flex-1 desktop:mt-xl">
+        <main id="rolesList" class="char-workspace">
+          <section class="workspace-card role-selection-card" aria-labelledby="roleSelectionTitle">
+            <div class="card-heading"><div><h2 id="roleSelectionTitle">내 배역 고르기</h2><p>내가 읽을 배역을 선택하세요.</p></div></div>
           <div id="includedRolesList" class="grid grid-cols-2 gap-sm"></div>
 
           <section id="excludedRolesSection" class="mt-sm hidden">
@@ -216,8 +227,11 @@
           </section>
 
           <p id="roleIncludeError" class="mb-0 mt-md text-[13px] font-medium text-danger empty:hidden" aria-live="polite"></p>
+          </section>
 
-          <fieldset class="mt-xl grid grid-cols-2 gap-sm border-0 p-0" aria-label="읽어주기 / 암기 테스트">
+          <aside class="workspace-card reading-config-card" aria-labelledby="modeSelectionTitle">
+          <div class="card-heading"><div><h2 id="modeSelectionTitle">리딩 방식</h2><p>연습할 방식을 고른 뒤 세부 설정을 확인하세요.</p></div></div>
+          <fieldset class="mode-picker grid grid-cols-2 gap-sm border-0 p-0" aria-label="읽어주기 / 암기 테스트">
             <label class="radio-tap-target flex cursor-pointer items-center gap-sm rounded-lg bg-surface px-sm shadow-card">
               <input type="radio" name="practiceMode" value="read" class="radio-input shrink-0" checked>
               <strong class="text-[15px] font-semibold text-ink">읽어주기</strong>
@@ -340,17 +354,24 @@
               </div>
             </section>
           </div>
+          </aside>
 
           <p class="mb-0 mt-xl text-center text-[13px] font-medium text-ink-sub desktop:text-left">
             <a class="inline-flex min-h-11 items-center rounded-sm px-sm underline" href="/privacy">대본은 어디로 가나요</a>
           </p>
         </main>
 
-        <footer class="tier-sticky-bottom mt-auto">
-          <button id="startButton" type="button" class="wide-action h-14 w-full rounded-lg bg-primary-strong font-bold text-white active:bg-primary-deep disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-tertiary">연습 시작</button>
+        <footer class="char-action-bar tier-sticky-bottom mt-auto">
+          <button id="startButton" type="button" class="button-primary button-large wide-action w-full disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-tertiary">연습 시작</button>
         </footer>
       </div>
     </div>
+    <nav class="mobile-tabs" aria-label="주요 단계" data-tier-only="phone">
+      <a href="/"><span class="tab-icon">⌂</span><span>홈</span></a>
+      <a class="is-active" href="/input" aria-current="page"><span class="tab-icon">▤</span><span>대본</span></a>
+      <a href="/char"><span class="tab-icon">▷</span><span>리딩</span></a>
+      <a href="/quiz#completionState"><span class="tab-icon">▥</span><span>요약</span></a>
+    </nav>
     <script type="module" src="/app/char.js"></script>
   </body>
 </html>

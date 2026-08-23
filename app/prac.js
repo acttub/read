@@ -42,12 +42,18 @@ function initializePracticePage() {
   const currentRoleName = document.getElementById("currentRoleName");
   const currentLineText = document.getElementById("currentLineText");
   const progressText = document.getElementById("progressText");
+  const mobileRemaining = document.getElementById("mobileRemaining");
+  const elapsedTime = document.getElementById("elapsedTime");
+  const mobileElapsed = document.getElementById("mobileElapsed");
+  const readingPastTurns = document.getElementById("readingPastTurns");
+  const readingNextTurn = document.getElementById("readingNextTurn");
   const statusPill = document.getElementById("statusPill");
   const modeError = document.getElementById("modeError");
   const completionMessage = document.getElementById("completionMessage");
   const pauseButton = document.getElementById("pauseButton");
   const nextButton = document.getElementById("nextButton");
   const modeHint = document.getElementById("modeHint");
+  document.getElementById("sessionTitle").textContent = `리딩 중 · ${myRole}`;
 
   const RMS_THRESHOLD = 0.02;
   const SpeechRecognitionCtor =
@@ -56,9 +62,9 @@ function initializePracticePage() {
   // 그 순간 눌러야 할 것이 항상 파란 주 버튼이 되게 한다(시작 전엔 "시작", 내 차례를
   // 기다릴 땐 "다음"). syncControls()가 이 두 클래스를 오가며 갈아 끼운다.
   const PRIMARY_BUTTON_CLASS =
-    "h-14 w-full flex-1 rounded-lg bg-primary-strong font-bold text-white active:bg-primary-deep disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-tertiary";
+    "session-control-primary";
   const SECONDARY_BUTTON_CLASS =
-    "h-14 w-full flex-1 rounded-lg bg-primary-soft font-semibold text-primary active:bg-primary-soft-hover disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-tertiary";
+    "session-control-secondary";
 
   let idx = 0;
   let sessionActive = true;
@@ -98,6 +104,7 @@ function initializePracticePage() {
   let speechWatchdogTimer = null;
   let speechWatchdogDueAt = 0;
   let speechWatchdogRemainingMs = 0;
+  let sessionClockTimer = null;
 
   const modeHints = {
     tap: "화면을 누르면 다음으로",
@@ -107,14 +114,68 @@ function initializePracticePage() {
 
   function setStatus(text, tone = "neutral") {
     statusPill.textContent = text;
-    statusPill.className =
-      tone === "primary"
-        ? "inline-flex rounded-pill bg-primary-soft px-3 py-1 text-[12px] font-semibold text-primary"
-        : "inline-flex rounded-pill bg-surface px-3 py-1 text-[12px] font-semibold text-ink-sub";
+    statusPill.className = "sr-only";
+  }
+
+  function formatElapsed(ms) {
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  function updateElapsedTime() {
+    const value = formatElapsed(Date.now() - practiceStartedAt);
+    elapsedTime.textContent = value;
+    mobileElapsed.textContent = value;
+  }
+
+  function scheduleSessionClock() {
+    updateElapsedTime();
+    sessionClockTimer = window.setTimeout(() => {
+      sessionClockTimer = null;
+      if (!sessionActive || ended) return;
+      scheduleSessionClock();
+    }, 1000);
+  }
+
+  function makeContextTurn(turn, className) {
+    const item = document.createElement("div");
+    item.className = className;
+    if (!turn.isDirection) {
+      const role = document.createElement("p");
+      role.textContent = turn.role === myRole ? `${turn.role} · 내 대사` : turn.role;
+      item.append(role);
+    }
+    const text = document.createElement("p");
+    text.className = "font-script";
+    text.textContent = turn.text;
+    item.append(text);
+    return item;
+  }
+
+  function renderTurnContext() {
+    const fragment = document.createDocumentFragment();
+    for (let index = Math.max(0, idx - 2); index < idx; index += 1) {
+      fragment.append(makeContextTurn(turns[index], "reading-context-turn"));
+    }
+    readingPastTurns.replaceChildren(fragment);
+
+    readingNextTurn.replaceChildren();
+    const nextTurn = turns[idx + 1];
+    if (nextTurn) {
+      readingNextTurn.append(makeContextTurn(nextTurn, "reading-context-turn"));
+      readingNextTurn.hidden = false;
+    } else {
+      readingNextTurn.hidden = true;
+    }
   }
 
   function renderCurrentTurn(turn) {
-    progressText.textContent = `${idx + 1} / ${turns.length}`;
+    const remaining = Math.max(turns.length - idx, 0);
+    progressText.textContent = String(remaining);
+    mobileRemaining.textContent = String(remaining);
+    renderTurnContext();
     currentRoleName.textContent =
       turn.role === myRole && !turn.isDirection
         ? `${turn.role} · 내 차례`
@@ -126,8 +187,8 @@ function initializePracticePage() {
     currentLineCard.classList.toggle("bg-surface", !isMyTurn);
 
     currentLineText.className = turn.isDirection
-      ? "m-0 font-script text-[16px] font-normal italic leading-[1.6] text-ink-tertiary"
-      : "m-0 font-script text-[22px] font-bold leading-[1.45] text-ink";
+      ? "font-script is-direction"
+      : "font-script";
   }
 
   function renderInitialState() {
@@ -853,8 +914,11 @@ function initializePracticePage() {
       window.speechSynthesis.cancel();
     }
 
-    progressText.textContent =
-      turns.length > 0 ? `${turns.length} / ${turns.length}` : "0 / 0";
+    progressText.textContent = "0";
+    mobileRemaining.textContent = "0";
+    updateElapsedTime();
+    if (sessionClockTimer) window.clearTimeout(sessionClockTimer);
+    sessionClockTimer = null;
     currentRoleName.textContent = "";
     currentLineText.textContent = "대본을 다 읽었어요";
     currentLineText.className =
@@ -862,6 +926,7 @@ function initializePracticePage() {
     currentLineCard.classList.remove("bg-primary-soft");
     currentLineCard.classList.add("bg-surface");
     completionMessage.classList.remove("hidden");
+    readingSurface.classList.add("reading-complete");
     setStatus("완료");
     modeError.textContent = "";
     pauseButton.textContent = "일시정지";
@@ -895,6 +960,8 @@ function initializePracticePage() {
     stopDirectionTimer();
     stopSpeechWatchdog();
     cleanupMedia();
+    if (sessionClockTimer) window.clearTimeout(sessionClockTimer);
+    sessionClockTimer = null;
     if (isCloudUtterance()) {
       currentUtterance.onend = null;
       currentUtterance.onerror = null;
@@ -1029,5 +1096,6 @@ function initializePracticePage() {
     }
   });
 
+  scheduleSessionClock();
   renderInitialState();
 }

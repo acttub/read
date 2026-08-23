@@ -23,49 +23,78 @@
     })();
     </script>
   </head>
-  <body class="m-0 bg-neutral font-sans text-ink">
-    <div id="readingSurface" class="tier-root bg-neutral">
-      <div class="tier-shell flex min-h-[var(--app-min-h)] flex-col pt-md">
-        <header class="flex min-h-11 items-center justify-between gap-4 pb-lg">
-          <button id="exitButton" type="button" class="bg-transparent p-0 text-[14px] font-medium text-ink-tertiary">✕ 나가기</button>
-          <p id="progressText" class="m-0 text-[14px] font-semibold tabular-nums text-ink-sub">1 / 1</p>
+  <body class="reading-page m-0 bg-session font-sans text-white">
+    <header class="desktop-header summary-header" data-tier-only="desktop">
+      <div class="desktop-header-inner">
+        <a class="brand-lockup" href="/" aria-label="acttub read 홈"><span class="brand-mark" aria-hidden="true"></span><span>acttub read</span></a>
+        <nav class="desktop-nav" aria-label="주요 단계"><a href="/">홈</a><a href="/input">대본</a><a href="/char">리딩</a><a class="is-active" href="#completionMessage">요약</a></nav>
+        <div class="desktop-actions"><a class="button-secondary" href="/input">새 대본</a><a class="button-primary" href="/char">다시 리딩</a></div>
+      </div>
+    </header>
+
+    <div id="readingSurface" class="tier-root session-page">
+      <div class="tier-shell reading-shell">
+        <header class="session-header">
+          <div>
+            <button id="exitButton" type="button" class="session-exit">✕ 나가기</button>
+            <h1 id="sessionTitle">리딩 중</h1>
+          </div>
+          <div class="session-header-status">
+            <span><strong id="mobileRemaining">—</strong><small>남은 대사</small></span>
+            <span><strong id="mobileElapsed" class="time-value">00:00</strong><small>경과 시간</small></span>
+          </div>
         </header>
 
-        <!-- 대사 카드 하나만 작게 상단에 떠 있고 화면 절반 이상이 빈 회색으로 남는
-             문제가 있었다(가운데 정렬만으로는 위아래로 나뉠 뿐 빈 공간 총량이 그대로였다 —
-             실측: flex-1+justify-center로도 88% 그대로 비어 있었다). 카드 자체를
-             flex-1로 키워 화면을 채우고, 카드 안에서 역할·대사를 다시 세로 가운데로 둔다. -->
-        <main class="flex flex-1 flex-col gap-md">
-          <section id="currentLineCard" class="flex flex-1 flex-col items-center justify-center bg-surface p-5 rounded-xl shadow-card">
-            <p id="currentRoleName" class="mb-2 mt-0 text-[13px] font-bold tracking-[0.02em] text-primary"></p>
-            <p id="currentLineText" class="m-0 text-center font-script text-[22px] font-bold leading-[1.45] text-ink"></p>
+        <main id="readingStage" class="session-layout">
+          <section class="session-document" aria-label="진행 중인 대본">
+            <div id="readingPastTurns" class="reading-past-turns" aria-hidden="true"></div>
+            <section id="currentLineCard" class="reading-current-turn bg-surface">
+              <p id="currentRoleName"></p>
+              <p id="currentLineText" class="font-script"></p>
+            </section>
+            <div id="readingNextTurn" class="reading-next-turn" aria-hidden="true"></div>
           </section>
 
-          <div>
-            <span id="statusPill" class="inline-flex rounded-pill bg-surface px-3 py-1 text-[12px] font-semibold text-ink-sub" aria-live="polite">누르면 시작해요</span>
-            <p id="modeError" class="mb-0 mt-2 text-[13px] font-medium text-danger" aria-live="polite"></p>
+          <aside class="session-status-panel" aria-label="세션 상태" data-tier-only="desktop">
+            <h2>세션 상태</h2>
+            <div class="status-card"><strong id="progressText">—</strong><span>남은 대사</span></div>
+            <div class="status-card"><strong id="elapsedTime" class="time-value">00:00</strong><span>경과 시간</span></div>
+          </aside>
+
+          <div class="session-feedback">
+            <span id="statusPill" class="sr-only" aria-live="polite">누르면 시작해요</span>
+            <p id="modeError" aria-live="polite"></p>
           </div>
-
-          <section id="completionMessage" class="hidden bg-surface p-5 rounded-xl shadow-card">
-            <p class="m-0 text-body-lg text-ink-sub">
-              상대 대사는 기계가 읽었어. 근데 네 대사에 무슨 생각을 담을지는 네가 정한 거야 —
-              <a href="https://acttub.com" class="font-semibold text-primary underline underline-offset-4">acttub에서 질문으로 →</a>
-            </p>
-          </section>
         </main>
 
-        <footer class="pt-lg">
-          <!-- 시작 전엔 "시작"이 주 버튼(파란색)이고 "다음"은 비활성 — 그 순간 눌러야 할
-               것이 항상 파란 버튼이 되도록 app/prac.js의 syncControls()가 상태에 따라
-               이 두 클래스를 갈아 끼운다. 아래는 "시작 전" 초기값이다. -->
-          <div class="flex gap-3">
-            <button id="pauseButton" type="button" class="h-14 w-full flex-1 rounded-lg bg-primary-strong font-bold text-white active:bg-primary-deep disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-tertiary">시작</button>
-            <button id="nextButton" type="button" class="h-14 w-full flex-1 rounded-lg bg-primary-soft font-semibold text-primary active:bg-primary-soft-hover disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-tertiary" disabled>다음</button>
+        <section id="completionMessage" class="completion-panel hidden">
+          <div class="completion-heading">
+            <div><p class="summary-eyebrow">요약</p><h1>리딩이 완료되었습니다</h1><p>대본의 마지막 줄까지 이어갔어요.</p></div>
+            <a class="button-primary button-large" href="/char">다시 리딩</a>
           </div>
-          <p id="modeHint" class="mb-0 mt-2 text-center text-[13px] font-medium text-ink-tertiary">시작을 누르면 읽어드릴게요</p>
+          <article class="completion-core-card">
+            <p>상대 대사는 기계가 읽었어. 근데 네 대사에 무슨 생각을 담을지는 네가 정한 거야 —</p>
+            <a href="https://acttub.com">acttub에서 질문으로 →</a>
+          </article>
+        </section>
+
+        <footer class="session-controls">
+          <div class="session-control-buttons">
+            <button id="pauseButton" type="button" class="session-control-primary">시작</button>
+            <button id="nextButton" type="button" class="session-control-secondary" disabled>다음</button>
+            <a class="session-control-link" href="/char" aria-label="리딩 설정">⚙</a>
+          </div>
+          <p id="modeHint">시작을 누르면 읽어드릴게요</p>
         </footer>
       </div>
     </div>
+
+    <nav class="mobile-tabs session-tabs" aria-label="주요 단계" data-tier-only="phone">
+      <a href="/"><span class="tab-icon">⌂</span><span>홈</span></a>
+      <a href="/input"><span class="tab-icon">▤</span><span>대본</span></a>
+      <a class="is-active reading-tab" href="#readingStage" aria-current="page"><span class="tab-icon">▷</span><span>리딩</span></a>
+      <a class="summary-tab" href="#completionMessage"><span class="tab-icon">▥</span><span>요약</span></a>
+    </nav>
     <script type="module" src="/app/prac.js"></script>
   </body>
 </html>

@@ -4,64 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
-    <!-- ── 인스타 인앱 브라우저에서 빠져나오기 ──
-         인스타 캡션·DM·공유 링크로 이 주소에 바로 들어오면 인스타 안에 갇힌 웹뷰로 열린다.
-
-         안드로이드: intent 스킴으로 기본 브라우저를 부른다. 크롬을 package로 못박지 않는다 —
-           못박으면 크롬이 없는 기기(삼성 인터넷만 쓰는 갤럭시)에서 실패하고,
-           그때 쓰는 S.browser_fallback_url은 안드로이드 시스템이 아니라 intent를 해석한 쪽이
-           처리하는 관례라 인스타 웹뷰가 구현하지 않았으면 에러 화면으로 끝난다.
-           package를 빼면 기본 브라우저는 항상 존재하므로 그 실패 경로 자체가 없어진다.
-           기본 브라우저가 크롬인 기기가 대부분이라 실제로도 크롬이 뜬다.
-
-         iOS: 방법이 없다. 브라우저 종류의 문제가 아니라 WKWebView가 커스텀 스킴을 호스트 앱에
-           넘기지 않아서다 — 사파리든 크롬이든 웨일이든 똑같이 막힌다.
-           x-safari-https도 instagram://extbrowser도 인스타가 막았다(2026-08-10 재확인).
-           인앱 우측 상단 ··· 메뉴에서 사용자가 직접 여는 길밖에 없다.
-
-         자동 전환은 보장되지 않는다. 파싱 중 실행되는 location.replace에는 사용자 제스처가
-         없어서 웹뷰가 intent 실행을 거부할 수 있다. link-hub에는 그때를 위해 누를 수 있는
-         배너 버튼이 따로 있지만(탭에는 제스처가 붙는다) 그 스타일이 link-hub 전용이라
-         여기엔 자동 전환만 가져왔다 — 전환이 실패하면 인앱에 그대로 남는다.
-
-         정본은 acttub/link-hub의 index.html이다. 고칠 일이 생기면 거기서 고치고 여기로 옮긴다.
-         ⚠️ 이 블록만 지우면 원래 동작으로 완전히 되돌아간다. -->
+    <!-- 인스타 인앱 브라우저 안드로이드 자동 전환. 기존 진입 가드레일을 유지한다. -->
     <script>
     (function () {
       var ua = navigator.userAgent || "";
-
-      // 메타 계열 인앱 웹뷰만 본다. 카카오·네이버 인앱은 건드리지 않는다 —
-      // 인스타 유입만 대상이고, 다른 인앱에서 intent 전환이 어떻게 도는지는 확인한 적이 없다.
       if (!/Instagram|FBAN|FBAV|FB_IAB|Threads/i.test(ua)) return;
-
-      var android = /Android/i.test(ua);
-
-      if (!android) return;
-
-      // 프래그먼트는 떼어낸다 — intent 문법에서 #이 구분자라 그대로 넣으면 주소가 깨진다.
-      // UTM을 포함한 쿼리는 그대로 넘어간다.
-      var intent = "intent://" + location.href.split("#")[0].replace(/^https?:\/\//, "") +
-                   "#Intent;scheme=https;end";
-
-      // ib=1은 자동 전환을 끄는 스위치다. 손으로 확인할 때 쓴다(?ib=1을 붙여서 연다).
-      // 값이 %69b 처럼 인코딩돼 들어와도 같게 읽히도록 문자열이 아니라 파라미터로 판정한다.
+      if (!/Android/i.test(ua)) return;
       try {
         if (new URLSearchParams(location.search).get("ib") === "1") return;
       } catch (e) {
-        if (/[?&]ib=1(&|$)/.test(location.search)) return;   // URLSearchParams가 없는 낡은 웹뷰
+        if (/[?&]ib=1(&|$)/.test(location.search)) return;
       }
-
-      // 자동화 브라우저에서는 전환하지 않는다. tools/device-matrix.py의 insta-inapp-android
-      // 프리셋이 인스타 UA로 도는데, 여기서 페이지를 떠나면 하네스가 레이아웃을 잴 대상을 잃는다.
-      // 진짜 사용자 브라우저에서는 이 값이 서지 않는다.
       if (navigator.webdriver) return;
-
+      var intent = "intent://" + location.href.split("#")[0].replace(/^https?:\/\//, "") +
+                   "#Intent;scheme=https;end";
       location.replace(intent);
     })();
     </script>
     <title>혼자 하는 대본 리딩 · acttub</title>
-    <!-- 크롤러는 아래 redirect를 실행하지 않는다. 공유 카드 정보는 이 문서에 둔다.
-         문구를 고치면 design/render-og.py의 카드 문구도 같이 본다. -->
     <meta name="description" content="대본을 붙여넣고 내 배역을 고르면, 나머지 배역의 대사를 소리로 읽어줍니다. 상대 없이 혼자 리딩하는 도구예요. 대본은 이 기기에만 저장돼요.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://read.acttub.com/">
@@ -72,10 +32,86 @@
     <meta name="twitter:card" content="summary_large_image">
     <link rel="icon" href="/favicon.ico" sizes="any">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="stylesheet" href="/styles.css">
   </head>
-  <body>
-    <script>
-      location.replace("/input");
-    </script>
+  <body class="home-page m-0 bg-canvas font-sans text-ink">
+    <header class="desktop-header" data-tier-only="desktop">
+      <div class="desktop-header-inner">
+        <a class="brand-lockup" href="/" aria-label="acttub read 홈">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span>acttub read</span>
+        </a>
+        <nav class="desktop-nav" aria-label="주요 단계">
+          <a class="is-active" href="/">홈</a>
+          <a href="/input">대본</a>
+          <a href="/char">리딩</a>
+          <a href="/quiz#completionState">요약</a>
+        </nav>
+        <div class="desktop-actions">
+          <a class="button-secondary" href="/input">새 대본</a>
+          <a class="button-primary" href="/char">바로 리딩</a>
+        </div>
+      </div>
+    </header>
+
+    <div class="tier-root app-page">
+      <main class="tier-shell home-shell">
+        <a class="brand-lockup mobile-brand" href="/" aria-label="acttub read 홈">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span>acttub read</span>
+        </a>
+
+        <section class="home-hero" aria-labelledby="homeTitle">
+          <div class="home-copy">
+            <p class="hero-eyebrow">AI 대본 리딩 파트너</p>
+            <h1 id="homeTitle">대본 넣고, 배역 정하고,<br data-tier-only="desktop"> 바로 리딩</h1>
+            <p class="hero-description">혼자서도 상대 대사를 듣고 내 차례에 맞춰 연습하세요.</p>
+            <div class="home-actions">
+              <a class="button-primary button-large" href="/input">대본 넣기</a>
+              <a class="button-secondary button-large" href="/char">바로 리딩</a>
+            </div>
+            <ol class="step-rail" aria-label="리딩 준비 단계">
+              <li class="is-done">대본 넣기</li>
+              <li class="is-current">배역 정하기</li>
+              <li>바로 리딩</li>
+            </ol>
+          </div>
+
+          <div class="hero-preview" aria-hidden="true">
+            <div class="preview-heading">
+              <span>오늘의 리딩</span>
+              <span class="preview-time">--:--</span>
+            </div>
+            <div class="preview-turn is-past">
+              <span class="preview-label">상대 배역</span>
+              <span class="preview-line"></span>
+            </div>
+            <div class="preview-turn is-mine">
+              <span class="preview-label">내 대사</span>
+              <span class="preview-line"></span>
+              <span class="preview-line short"></span>
+            </div>
+            <div class="preview-turn">
+              <span class="preview-label">상대 배역</span>
+              <span class="preview-line"></span>
+            </div>
+          </div>
+        </section>
+
+        <section class="home-features" aria-label="주요 기능" data-tier-only="desktop">
+          <article><h2>대본 불러오기</h2><p>파일과 붙여넣기로 대본을 준비합니다.</p></article>
+          <article><h2>배역 자동 분리</h2><p>등장인물과 대사 수를 확인하고 내 배역을 고릅니다.</p></article>
+          <article><h2>바로 리딩</h2><p>상대 대사를 들으며 내 차례에 맞춰 이어갑니다.</p></article>
+        </section>
+      </main>
+    </div>
+
+    <nav class="mobile-tabs" aria-label="주요 단계" data-tier-only="phone">
+      <a class="is-active" href="/" aria-current="page"><span class="tab-icon">⌂</span><span>홈</span></a>
+      <a href="/input"><span class="tab-icon">▤</span><span>대본</span></a>
+      <a href="/char"><span class="tab-icon">▷</span><span>리딩</span></a>
+      <a href="/quiz#completionState"><span class="tab-icon">▥</span><span>요약</span></a>
+    </nav>
+    <script type="module" src="/app/home.js"></script>
   </body>
 </html>
