@@ -115,47 +115,79 @@ export function jamoSimilarity(original, spoken) {
   return 1 - distance / Math.max(originalJamo.length, spokenJamo.length, 1);
 }
 
-export function scoreVoiceAttempt(original, spoken) {
-  return {
-    dialogue: wordMatchRatio(original, spoken),
-    pronunciation: jamoSimilarity(original, spoken),
+export function scoreAttempt(original, response, source) {
+  const score = {
+    source,
+    dialogue: wordMatchRatio(original, response),
   };
+  if (source === "voice") {
+    score.pronunciation = jamoSimilarity(original, response);
+  }
+  return score;
 }
 
-export function summarizeVoiceAttempts(attempts) {
-  const bestByLine = new Map();
+export function scoreVoiceAttempt(original, spoken) {
+  return scoreAttempt(original, spoken, "voice");
+}
+
+export function scoreTextAttempt(original, typed) {
+  return scoreAttempt(original, typed, "text");
+}
+
+function roundedAverage(bestByLine) {
+  if (bestByLine.size === 0) return null;
+  const total = [...bestByLine.values()].reduce(
+    (sum, score) => sum + score,
+    0,
+  );
+  return Math.round(100 * total / bestByLine.size);
+}
+
+export function summarizeAttempts(attempts) {
+  const bestDialogueByLine = new Map();
+  const bestPronunciationByLine = new Map();
 
   for (const attempt of attempts) {
-    if (!attempt || !Number.isInteger(attempt.lineIndex)) continue;
     if (
-      !Number.isFinite(attempt.dialogue) ||
-      !Number.isFinite(attempt.pronunciation)
+      !attempt ||
+      !Number.isInteger(attempt.lineIndex) ||
+      !["voice", "text"].includes(attempt.source) ||
+      !Number.isFinite(attempt.dialogue)
     ) continue;
-    const best = bestByLine.get(attempt.lineIndex);
-    bestByLine.set(attempt.lineIndex, {
-      dialogue: Math.max(best?.dialogue ?? 0, attempt.dialogue),
-      pronunciation: Math.max(
-        best?.pronunciation ?? 0,
-        attempt.pronunciation,
-      ),
-    });
+
+    bestDialogueByLine.set(
+      attempt.lineIndex,
+      Math.max(bestDialogueByLine.get(attempt.lineIndex) ?? 0, attempt.dialogue),
+    );
+    if (attempt.source === "voice" && Number.isFinite(attempt.pronunciation)) {
+      bestPronunciationByLine.set(
+        attempt.lineIndex,
+        Math.max(
+          bestPronunciationByLine.get(attempt.lineIndex) ?? 0,
+          attempt.pronunciation,
+        ),
+      );
+    }
   }
 
-  if (bestByLine.size === 0) return null;
-  const totals = [...bestByLine.values()].reduce(
-    (sum, scores) => ({
-      dialogue: sum.dialogue + scores.dialogue,
-      pronunciation: sum.pronunciation + scores.pronunciation,
-    }),
-    { dialogue: 0, pronunciation: 0 },
-  );
+  const dialogueAccuracy = roundedAverage(bestDialogueByLine);
+  if (dialogueAccuracy === null) return null;
 
-  return {
-    dialogueAccuracy: Math.round(100 * totals.dialogue / bestByLine.size),
-    pronunciationAccuracy: Math.round(
-      100 * totals.pronunciation / bestByLine.size,
+  const summary = { dialogueAccuracy };
+  const pronunciationAccuracy = roundedAverage(bestPronunciationByLine);
+  if (pronunciationAccuracy !== null) {
+    summary.pronunciationAccuracy = pronunciationAccuracy;
+  }
+  return summary;
+}
+
+// 기존 음성 전용 호출부를 위한 호환 export. 새 요약은 출처가 있는 summarizeAttempts를 쓴다.
+export function summarizeVoiceAttempts(attempts) {
+  return summarizeAttempts(
+    attempts.map((attempt) =>
+      attempt?.source ? attempt : { ...attempt, source: "voice" }
     ),
-  };
+  );
 }
 
 function usesExactMode(options) {

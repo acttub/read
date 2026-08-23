@@ -5,7 +5,10 @@ import {
   compare,
   jamoSimilarity,
   normalize,
+  scoreAttempt,
+  scoreTextAttempt,
   scoreVoiceAttempt,
+  summarizeAttempts,
   summarizeVoiceAttempts,
   toJamo,
   wordMatchRatio,
@@ -115,6 +118,40 @@ test("줄마다 최고 시도를 고르고 조용히 통과한 줄도 평균에 
 
   assert.deepEqual(summary, {
     dialogueAccuracy: 50,
+    pronunciationAccuracy: 50,
+  });
+});
+
+test("입력 시도만 있으면 대사 정확도만 요약한다", () => {
+  const summary = summarizeAttempts([
+    { lineIndex: 0, ...scoreTextAttempt("가", "가") },
+    { lineIndex: 1, ...scoreAttempt("나", "힣", "text") },
+  ]);
+
+  assert.deepEqual(summary, { dialogueAccuracy: 50 });
+});
+
+test("음성 시도만 있으면 대사와 발음 정확도를 요약한다", () => {
+  const summary = summarizeAttempts([
+    { lineIndex: 0, ...scoreVoiceAttempt("가", "가") },
+    { lineIndex: 1, ...scoreVoiceAttempt("나", "힣") },
+  ]);
+
+  assert.deepEqual(summary, {
+    dialogueAccuracy: 50,
+    pronunciationAccuracy: 50,
+  });
+});
+
+test("혼합 시도는 대사는 모두, 발음은 음성 출처만 줄별 최고값을 쓴다", () => {
+  const summary = summarizeAttempts([
+    { lineIndex: 0, ...scoreVoiceAttempt("가", "힣") },
+    { lineIndex: 0, ...scoreTextAttempt("가", "가") },
+    { lineIndex: 1, ...scoreVoiceAttempt("나", "나") },
+  ]);
+
+  assert.deepEqual(summary, {
+    dialogueAccuracy: 100,
     pronunciationAccuracy: 50,
   });
 });

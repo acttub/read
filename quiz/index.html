@@ -51,11 +51,13 @@
             <div id="modeControls" class="quiz-mode-controls" role="radiogroup" aria-label="암기 방식">
               <label><input id="voiceModeInput" type="radio" name="quizMode" value="voice"><span>말하기</span></label>
               <label><input id="silentModeInput" type="radio" name="quizMode" value="silent"><span>무음</span></label>
+              <label><input id="textModeInput" type="radio" name="quizMode" value="text"><span>입력하기</span></label>
             </div>
           </div>
         </header>
         <div class="quiz-disclosures">
           <p id="voiceDisclosure">말하기를 쓰면 말소리가 acttub 서버를 거쳐 OpenAI로 전송돼 글자로 바뀌어요. 바뀐 뒤 녹음은 바로 버려요.</p>
+          <p id="textDisclosure" hidden>대사를 쓰면 원문과 맞춰봐요.</p>
           <p id="modeNotice" aria-live="polite"></p>
         </div>
 
@@ -73,6 +75,11 @@
                   <p id="roleName" class="quiz-turn-role"></p>
                   <p id="lineDisplay" class="quiz-turn-text" aria-live="polite"></p>
                   <div id="differentWords" class="different-words" hidden></div>
+                  <form id="textAnswerForm" class="quiz-text-entry" hidden>
+                    <label class="sr-only" for="textAnswerInput">내 대사 입력</label>
+                    <textarea id="textAnswerInput" class="quiz-text-input" rows="2" autocomplete="off" aria-describedby="textDisclosure" placeholder="대사를 써보세요"></textarea>
+                    <button id="textAnswerButton" type="submit">확인</button>
+                  </form>
                 </div>
               </div>
               <p id="futureMarker" class="future-marker" aria-hidden="true">· · ·</p>
@@ -86,10 +93,10 @@
 
           <section id="completionState" class="completion-panel quiz-completion" hidden>
             <div class="completion-heading">
-              <div><p class="summary-eyebrow">요약</p><h1>리딩이 완료되었습니다</h1><p>대사 정확도와 발음 정확도를 정리했습니다.</p></div>
+              <div><p class="summary-eyebrow">요약</p><h1>리딩이 완료되었습니다</h1><p id="summaryDescription">대사 정확도와 발음 정확도를 정리했습니다.</p></div>
               <a class="button-primary button-large" href="/char">다시 리딩</a>
             </div>
-            <section id="summaryMetrics" class="summary-metrics" aria-label="음성 대조 요약" hidden></section>
+            <section id="summaryMetrics" class="summary-metrics" aria-label="대조 요약" hidden></section>
             <section id="reviewSection" class="review-section" hidden>
               <h2>아직 안 나온 줄</h2>
               <div id="reviewList" class="review-list"></div>

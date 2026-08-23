@@ -1,8 +1,8 @@
 import {
   compare,
   normalize,
-  scoreVoiceAttempt,
-  summarizeVoiceAttempts,
+  scoreAttempt,
+  summarizeAttempts,
 } from "./match.js";
 import { parseScript } from "./parse.js";
 import { readMyRole, readScript } from "./storage.js";
@@ -48,9 +48,9 @@ function initializeQuiz() {
     index: 0,
     status: new Map(),
     attempts: new Map(),
-    voiceAttempts: [],
+    scoredAttempts: [],
     hintWords: new Map(),
-    voiceMode: !inAppBrowser && initialVoiceEngine !== null,
+    quizMode: !inAppBrowser && initialVoiceEngine !== null ? "voice" : "silent",
     voiceEngine: initialVoiceEngine,
   };
 
@@ -76,8 +76,12 @@ function initializeQuiz() {
   const modeControls = document.getElementById("modeControls");
   const voiceModeInput = document.getElementById("voiceModeInput");
   const silentModeInput = document.getElementById("silentModeInput");
+  const textModeInput = document.getElementById("textModeInput");
   const voiceDisclosure = document.getElementById("voiceDisclosure");
+  const textDisclosure = document.getElementById("textDisclosure");
   const modeNotice = document.getElementById("modeNotice");
+  const textAnswerForm = document.getElementById("textAnswerForm");
+  const textAnswerInput = document.getElementById("textAnswerInput");
   const speakButton = document.getElementById("speakButton");
   const silentRecallButton = document.getElementById("silentRecallButton");
   const nextButton = document.getElementById("nextButton");
@@ -85,6 +89,7 @@ function initializeQuiz() {
   const overrideButton = document.getElementById("overrideButton");
   const hintButton = document.getElementById("hintButton");
   const originalButton = document.getElementById("originalButton");
+  const summaryDescription = document.getElementById("summaryDescription");
   const coreLink = document.getElementById("coreLink");
   coreLink.href = withInboundAdId(coreLink.getAttribute("href"));
   const actionButtons = [
@@ -242,34 +247,59 @@ function initializeQuiz() {
     }
   }
 
+  function clearTextAnswer() {
+    textAnswerInput.value = "";
+  }
+
+  function syncTextAnswerForm() {
+    const turn = currentTurn();
+    textAnswerForm.hidden = !(
+      state.quizMode === "text" &&
+      phase === "ready" &&
+      turn?.role === myRole &&
+      !isEffectiveDirection(turn)
+    );
+    if (textAnswerForm.hidden) clearTextAnswer();
+  }
+
   function syncModeControls() {
-    voiceModeInput.checked = state.voiceMode;
-    silentModeInput.checked = !state.voiceMode;
-    voiceDisclosure.hidden = !state.voiceMode;
+    voiceModeInput.checked = state.quizMode === "voice";
+    silentModeInput.checked = state.quizMode === "silent";
+    textModeInput.checked = state.quizMode === "text";
+    voiceDisclosure.hidden = state.quizMode !== "voice";
+    textDisclosure.hidden = state.quizMode !== "text";
     voiceDisclosure.textContent = state.voiceEngine === "server"
       ? "말하기를 쓰면 말소리가 acttub 서버를 거쳐 OpenAI로 전송돼 글자로 바뀌어요. 바뀐 뒤 녹음은 바로 버려요."
       : "말하기를 쓰면 말소리가 브라우저 제공사 서버로 전송돼요.";
+    textDisclosure.textContent = "대사를 쓰면 원문과 맞춰봐요.";
+    syncTextAnswerForm();
 
     if (
       phase === "ready" &&
       currentTurn()?.role === myRole &&
       !isEffectiveDirection(currentTurn())
     ) {
-      setOnlyActions(
-        state.voiceMode ? speakButton : silentRecallButton,
-        hintButton,
-        originalButton,
-      );
+      const primaryAction = state.quizMode === "voice"
+        ? speakButton
+        : state.quizMode === "silent"
+        ? silentRecallButton
+        : null;
+      const actions = [hintButton, originalButton];
+      if (primaryAction) actions.unshift(primaryAction);
+      setOnlyActions(...actions);
     }
   }
 
-  function setVoiceMode(enabled, message = "") {
+  function setQuizMode(mode, message = "") {
     stopRecognition();
-    state.voiceMode = enabled && state.voiceEngine !== null;
+    clearTextAnswer();
+    state.quizMode = mode === "voice" && state.voiceEngine === null
+      ? "silent"
+      : mode;
     if (["listening", "recording", "processing"].includes(phase)) {
       phase = "ready";
     }
-    if (enabled && state.voiceEngine === null && !message) {
+    if (mode === "voice" && state.voiceEngine === null && !message) {
       message =
         "이 브라우저에서는 말하기가 안 되네요. 떠올리고 확인하는 방식으로 이어갈게요.";
     }
@@ -342,6 +372,7 @@ function initializeQuiz() {
     stopRecognition();
     if (remember) state.status.set(state.index, "revealed");
     phase = "revealed";
+    syncTextAnswerForm();
     setLine(turn.text);
     differentWords.hidden = true;
     setOnlyActions(nextButton, retryButton);
@@ -365,27 +396,32 @@ function initializeQuiz() {
     if (!turn) return;
     markPassed(state.index);
     phase = "passing";
+    syncTextAnswerForm();
     setLine(turn.text);
     differentWords.hidden = true;
     setOnlyActions();
     passTimer = window.setTimeout(advanceTurn, 650);
   }
 
-  function handleRecognitionResults(transcripts) {
+  function handleRecognitionResults(transcripts, source = "voice") {
     const turn = currentTurn();
     if (!turn) return;
 
     if (transcripts.length === 0) {
       phase = "ready";
-      setNotice("안 들렸어요, 다시 눌러주세요");
+      setNotice(
+        source === "text"
+          ? "대사를 쓰고 확인해 주세요"
+          : "안 들렸어요, 다시 눌러주세요",
+      );
       showReadyMyTurn(turn);
       return;
     }
 
     for (const transcript of transcripts) {
-      state.voiceAttempts.push({
+      state.scoredAttempts.push({
         lineIndex: state.index,
-        ...scoreVoiceAttempt(turn.text, transcript),
+        ...scoreAttempt(turn.text, transcript, source),
       });
     }
 
@@ -414,6 +450,7 @@ function initializeQuiz() {
       return different < selectedDifferent ? result : selected;
     });
     phase = "failed";
+    syncTextAnswerForm();
     renderMaskedLine(turn);
     renderDifferentWords(closest.segments);
     setOnlyActions(retryButton, overrideButton, originalButton);
@@ -448,8 +485,8 @@ function initializeQuiz() {
     }
 
     state.voiceEngine = null;
-    setVoiceMode(
-      false,
+    setQuizMode(
+      "silent",
       "이 브라우저에서는 말하기가 안 되네요. 떠올리고 확인하는 방식으로 이어갈게요.",
     );
   }
@@ -494,7 +531,7 @@ function initializeQuiz() {
         requestVersion !== micRequestVersion ||
         activeTurnVersion !== turnVersion ||
         !sessionActive ||
-        !state.voiceMode ||
+        state.quizMode !== "voice" ||
         state.voiceEngine !== "server"
       ) return;
 
@@ -523,7 +560,7 @@ function initializeQuiz() {
         requestVersion === micRequestVersion &&
         activeTurnVersion === turnVersion &&
         sessionActive &&
-        state.voiceMode &&
+        state.quizMode === "voice" &&
         state.voiceEngine === "server"
       ) fallbackFromServer();
     } finally {
@@ -570,8 +607,8 @@ function initializeQuiz() {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
       if (requestVersion !== micRequestVersion) return;
-      setVoiceMode(
-        false,
+      setQuizMode(
+        "silent",
         "말하기는 브라우저에서 마이크를 허용하면 쓸 수 있어요",
       );
       return;
@@ -581,7 +618,7 @@ function initializeQuiz() {
       requestVersion !== micRequestVersion ||
       activeTurnVersion !== turnVersion ||
       !sessionActive ||
-      !state.voiceMode ||
+      state.quizMode !== "voice" ||
       state.voiceEngine !== "server"
     ) {
       stream.getTracks().forEach((track) => track.stop());
@@ -606,7 +643,7 @@ function initializeQuiz() {
         requestVersion === micRequestVersion &&
         activeTurnVersion === turnVersion &&
         sessionActive &&
-        state.voiceMode &&
+        state.quizMode === "voice" &&
         state.voiceEngine === "server";
     }
 
@@ -672,15 +709,15 @@ function initializeQuiz() {
     // 이벤트를 확인한다. 생성자 자체가 없을 때만 시도를 시작할 수 없어 무음으로 간다.
     if (!SpeechRecognitionCtor) {
       state.voiceEngine = null;
-      setVoiceMode(
-        false,
+      setQuizMode(
+        "silent",
         "이 브라우저에서는 말하기가 안 되네요. 떠올리고 확인하는 방식으로 이어갈게요.",
       );
       return;
     }
     if (!navigator.mediaDevices?.getUserMedia) {
-      setVoiceMode(
-        false,
+      setQuizMode(
+        "silent",
         "말하기는 브라우저에서 마이크를 허용하면 쓸 수 있어요",
       );
       return;
@@ -700,8 +737,8 @@ function initializeQuiz() {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
       if (requestVersion !== micRequestVersion) return;
-      setVoiceMode(
-        false,
+      setQuizMode(
+        "silent",
         "말하기는 브라우저에서 마이크를 허용하면 쓸 수 있어요",
       );
       return;
@@ -711,7 +748,7 @@ function initializeQuiz() {
       requestVersion !== micRequestVersion ||
       activeTurnVersion !== turnVersion ||
       !sessionActive ||
-      !state.voiceMode
+      state.quizMode !== "voice"
     ) {
       stream.getTracks().forEach((track) => track.stop());
       return;
@@ -795,8 +832,8 @@ function initializeQuiz() {
         event.error === "not-allowed" || event.error === "service-not-allowed";
       finishInstance();
       if (permissionDenied) {
-        setVoiceMode(
-          false,
+        setQuizMode(
+          "silent",
           "말하기는 브라우저에서 마이크를 허용하면 쓸 수 있어요",
         );
       } else {
@@ -834,16 +871,16 @@ function initializeQuiz() {
           voiceDeadTracked = true;
           trackMetric("quiz_voice_dead");
         }
-        setVoiceMode(
-          false,
+        setQuizMode(
+          "silent",
           "이 브라우저에서는 말하기가 안 되네요. 떠올리고 확인하는 방식으로 이어갈게요.",
         );
       }, 8000);
     } catch {
       settled = true;
       finishInstance();
-      setVoiceMode(
-        false,
+      setQuizMode(
+        "silent",
         "이 브라우저에서는 말하기가 안 되네요. 떠올리고 확인하는 방식으로 이어갈게요.",
       );
     }
@@ -863,8 +900,8 @@ function initializeQuiz() {
       void startBrowserRecognition();
       return;
     }
-    setVoiceMode(
-      false,
+    setQuizMode(
+      "silent",
       "이 브라우저에서는 말하기가 안 되네요. 떠올리고 확인하는 방식으로 이어갈게요.",
     );
   }
@@ -994,6 +1031,9 @@ function initializeQuiz() {
     completionState.hidden = false;
     modeControls.hidden = true;
     voiceDisclosure.hidden = true;
+    textDisclosure.hidden = true;
+    textAnswerForm.hidden = true;
+    clearTextAnswer();
     setOnlyActions();
     if (!finishTracked) {
       finishTracked = true;
@@ -1001,13 +1041,18 @@ function initializeQuiz() {
     }
     stopSessionClock();
 
-    const summary = summarizeVoiceAttempts(state.voiceAttempts);
+    const summary = summarizeAttempts(state.scoredAttempts);
     summaryMetrics.replaceChildren();
     if (summary) {
       const metrics = [
         ["대사 정확도", summary.dialogueAccuracy],
-        ["발음 정확도", summary.pronunciationAccuracy],
       ];
+      if (Number.isFinite(summary.pronunciationAccuracy)) {
+        metrics.push(["발음 정확도", summary.pronunciationAccuracy]);
+      }
+      summaryDescription.textContent = metrics.length === 2
+        ? "대사 정확도와 발음 정확도를 정리했습니다."
+        : "대사 정확도를 정리했습니다.";
       const fragment = document.createDocumentFragment();
       for (const [label, value] of metrics) {
         const card = document.createElement("article");
@@ -1024,6 +1069,7 @@ function initializeQuiz() {
       summaryMetrics.append(fragment);
       summaryMetrics.hidden = false;
     } else {
+      summaryDescription.textContent = "암기 테스트를 마쳤습니다.";
       summaryMetrics.hidden = true;
     }
 
@@ -1066,15 +1112,34 @@ function initializeQuiz() {
     emptyState.hidden = false;
     modeControls.hidden = true;
     voiceDisclosure.hidden = true;
+    textDisclosure.hidden = true;
+    textAnswerForm.hidden = true;
+    clearTextAnswer();
     setNotice("");
     setOnlyActions();
   }
 
   voiceModeInput.addEventListener("change", () => {
-    if (voiceModeInput.checked) setVoiceMode(true);
+    if (voiceModeInput.checked) setQuizMode("voice");
   });
   silentModeInput.addEventListener("change", () => {
-    if (silentModeInput.checked) setVoiceMode(false);
+    if (silentModeInput.checked) setQuizMode("silent");
+  });
+  textModeInput.addEventListener("change", () => {
+    if (textModeInput.checked) setQuizMode("text");
+  });
+  textAnswerForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (state.quizMode !== "text" || phase !== "ready") return;
+    const answer = textAnswerInput.value.trim();
+    clearTextAnswer();
+    handleRecognitionResults(answer ? [answer] : [], "text");
+  });
+  textAnswerInput.addEventListener("focus", () => {
+    window.requestAnimationFrame(() => {
+      if (textAnswerForm.hidden) return;
+      textAnswerForm.scrollIntoView({ block: "center" });
+    });
   });
   speakButton.addEventListener("click", startRecognition);
   silentRecallButton.addEventListener("click", () => {
@@ -1134,6 +1199,7 @@ function initializeQuiz() {
   });
   window.addEventListener("pagehide", () => {
     sessionActive = false;
+    clearTextAnswer();
     stopSessionClock();
     stopRecognition();
     clearTurnTimers();
@@ -1143,8 +1209,9 @@ function initializeQuiz() {
   });
 
   scheduleSessionClock();
-  voiceModeInput.checked = state.voiceMode;
-  silentModeInput.checked = !state.voiceMode;
+  voiceModeInput.checked = state.quizMode === "voice";
+  silentModeInput.checked = state.quizMode === "silent";
+  textModeInput.checked = state.quizMode === "text";
   if (inAppBrowser) {
     setNotice("브라우저로 열면 말하기로도 할 수 있어요");
   }

@@ -20,8 +20,13 @@ const ELEMENT_IDS = [
   "modeControls",
   "voiceModeInput",
   "silentModeInput",
+  "textModeInput",
   "voiceDisclosure",
+  "textDisclosure",
   "modeNotice",
+  "textAnswerForm",
+  "textAnswerInput",
+  "textAnswerButton",
   "speakButton",
   "silentRecallButton",
   "nextButton",
@@ -29,6 +34,7 @@ const ELEMENT_IDS = [
   "overrideButton",
   "hintButton",
   "originalButton",
+  "summaryDescription",
   "coreLink",
   "exitButton",
 ];
@@ -91,6 +97,7 @@ class FakeElement {
     this.hidden = false;
     this.disabled = false;
     this.checked = false;
+    this.value = "";
     this.dataset = {};
     this.children = [];
     this.attributes = new Map();
@@ -163,6 +170,18 @@ class FakeElement {
     }
   }
 
+  change() {
+    for (const listener of this.listeners.get("change") || []) {
+      listener({ target: this });
+    }
+  }
+
+  submit() {
+    for (const listener of this.listeners.get("submit") || []) {
+      listener({ target: this, preventDefault() {} });
+    }
+  }
+
   closest(selector) {
     return selector === "button[data-review-index]" &&
         this.tagName === "BUTTON" &&
@@ -185,6 +204,8 @@ class FakeDocument {
       "summaryMetrics",
       "reviewSection",
       "differentWords",
+      "textDisclosure",
+      "textAnswerForm",
     ]) {
       this.elements.get(id).hidden = true;
     }
@@ -213,9 +234,9 @@ class FakeDocument {
   }
 }
 
-function makeStorage() {
+function makeStorage(script = "나: 가") {
   const values = new Map([
-    ["read.script", "나: 가"],
+    ["read.script", script],
     ["read.myRole", "나"],
   ]);
   return {
@@ -279,9 +300,11 @@ async function settle() {
 async function startQuiz({
   voice = false,
   serverFallback = false,
+  script = "나: 가",
   transcripts = ["가"],
 } = {}) {
   const document = new FakeDocument();
+  const fetchCalls = [];
   const timers = new Map();
   let nextTimerId = 1;
   const windowListeners = new Map();
@@ -324,20 +347,24 @@ async function startQuiz({
   setGlobal("window", window);
   setGlobal("location", location);
   setGlobal("navigator", navigator);
-  setGlobal("sessionStorage", makeStorage());
-  setGlobal("fetch", async () => ({
-    status: 200,
-    ok: true,
-    async json() {
-      return { text: null, reason: "no_key" };
-    },
-  }));
+  setGlobal("sessionStorage", makeStorage(script));
+  setGlobal("fetch", async (...args) => {
+    fetchCalls.push(args);
+    return {
+      status: 200,
+      ok: true,
+      async json() {
+        return { text: null, reason: "no_key" };
+      },
+    };
+  });
 
   importSequence += 1;
   await import(`../app/quiz.js?summary-test=${importSequence}`);
 
   return {
     document,
+    fetchCalls,
     runTimer(delay) {
       const match = [...timers].find(([, timer]) => timer.delay === delay);
       assert.ok(match, `${delay}ms timer should exist`);
@@ -346,6 +373,17 @@ async function startQuiz({
       timer.callback();
     },
   };
+}
+
+function selectMode(quiz, id) {
+  const input = quiz.document.getElementById(id);
+  input.checked = true;
+  input.change();
+}
+
+function submitText(quiz, value) {
+  quiz.document.getElementById("textAnswerInput").value = value;
+  quiz.document.getElementById("textAnswerForm").submit();
 }
 
 test("음성 완주에는 두 요약 지표를 표시한다", async () => {
@@ -371,6 +409,68 @@ test("무음 완주에는 요약 지표 영역을 렌더하지 않는다", async
   const summary = quiz.document.getElementById("summaryMetrics");
   assert.equal(summary.hidden, true);
   assert.equal(summary.childElementCount, 0);
+});
+
+test("입력하기는 음성과 같은 느슨한 판정 경로를 타고 대사 지표만 표시한다", async () => {
+  const quiz = await startQuiz({ script: "나: 나는 기다려" });
+
+  selectMode(quiz, "textModeInput");
+  assert.equal(quiz.document.getElementById("textAnswerForm").hidden, false);
+  assert.match(
+    quiz.document.getElementById("textDisclosure").textContent,
+    /대사를 쓰면 원문과 맞춰봐요/,
+  );
+  submitText(quiz, "나 기다려");
+  assert.equal(quiz.document.getElementById("textAnswerInput").value, "");
+  assert.equal(quiz.fetchCalls.length, 0);
+  quiz.runTimer(650);
+
+  const summary = quiz.document.getElementById("summaryMetrics");
+  assert.equal(summary.hidden, false);
+  assert.equal(summary.childElementCount, 1);
+  assert.match(summary.textContent, /50%대사 정확도/);
+  assert.doesNotMatch(summary.textContent, /발음 정확도/);
+});
+
+test("입력하기도 같은 줄이 두 번 미달하면 안내 없이 통과한다", async () => {
+  const quiz = await startQuiz();
+
+  selectMode(quiz, "textModeInput");
+  submitText(quiz, "힣");
+  assert.equal(quiz.document.getElementById("retryButton").hidden, false);
+  quiz.document.getElementById("retryButton").click();
+  submitText(quiz, "힣");
+
+  const summary = quiz.document.getElementById("summaryMetrics");
+  assert.equal(summary.hidden, false);
+  assert.equal(summary.childElementCount, 1);
+  assert.match(summary.textContent, /0%대사 정확도/);
+  assert.equal(quiz.document.getElementById("modeNotice").textContent, "");
+});
+
+test("입력과 음성을 섞으면 대사는 전체 시도, 발음은 음성 시도만 표시한다", async () => {
+  const quiz = await startQuiz({
+    voice: true,
+    script: "나: 가\n나: 나",
+    transcripts: ["힣", "힣"],
+  });
+
+  selectMode(quiz, "textModeInput");
+  submitText(quiz, "가");
+  quiz.runTimer(650);
+
+  selectMode(quiz, "voiceModeInput");
+  quiz.document.getElementById("speakButton").click();
+  await settle();
+  quiz.document.getElementById("retryButton").click();
+  quiz.document.getElementById("speakButton").click();
+  await settle();
+
+  const summary = quiz.document.getElementById("summaryMetrics");
+  assert.equal(summary.hidden, false);
+  assert.equal(summary.childElementCount, 2);
+  assert.match(summary.textContent, /50%대사 정확도/);
+  assert.match(summary.textContent, /0%발음 정확도/);
 });
 
 test("두 번 미달해 조용히 통과한 줄도 요약에 포함한다", async () => {
