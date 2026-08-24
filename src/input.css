@@ -1219,6 +1219,20 @@ button {
   scroll-padding-bottom: 120px;
 }
 
+/* 폰·태블릿에서는 대본 영역을 고정 높이 내부 스크롤 대신 페이지 흐름으로 푼다 —
+   iOS에서 내부 스크롤 박스가 손가락 스크롤을 먹지 않는 문제를 구조로 피한다. */
+@media (max-width: 1023.98px) {
+  .quiz-document {
+    height: auto;
+    min-height: 200px;
+    overflow-y: visible;
+  }
+
+  html:has(.quiz-document) {
+    scroll-padding-bottom: calc(170px + var(--safe-bottom));
+  }
+}
+
 .quiz-turn {
   color: var(--color-ink);
 }

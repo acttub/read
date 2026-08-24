@@ -37,7 +37,6 @@ class FakeElement {
 function makeDocument() {
   const elements = new Map([
     ["scriptTurns", new FakeElement()],
-    ["chooseRoleButton", new FakeElement()],
   ]);
   return {
     createElement: () => new FakeElement(),
@@ -103,7 +102,8 @@ test("/script는 예시 대본의 12턴을 배역명과 대사로 전부 렌더�
     "utf8",
   );
   assert.match(html, /id="scriptTurns"/);
-  assert.match(html, /id="chooseRoleButton"/);
+  assert.match(html, /script-review-actions-top/);
+  assert.match(html, /href="\/char"/);
 
   await withScriptPage(SAMPLE_SCRIPT, ({ document, replaced }) => {
     const turns = document.elements.get("scriptTurns").children;
@@ -120,12 +120,5 @@ test("/script는 저장된 대본이 없으면 /input으로 돌려보낸다", as
   await withScriptPage("", ({ document, replaced }) => {
     assert.deepEqual(replaced, ["/input"]);
     assert.equal(document.elements.get("scriptTurns").children.length, 0);
-  });
-});
-
-test("/script의 배역 고르기 CTA는 /char로 이동한다", async () => {
-  await withScriptPage(SAMPLE_SCRIPT, ({ document, window }) => {
-    document.elements.get("chooseRoleButton").click();
-    assert.equal(window.location.href, "/char");
   });
 });

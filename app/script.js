@@ -17,7 +17,6 @@ function initializeScriptPage(scriptText) {
   }
 
   const scriptTurns = document.getElementById("scriptTurns");
-  const chooseRoleButton = document.getElementById("chooseRoleButton");
 
   const turnElements = turns.map((turn, index) => {
     const card = document.createElement("article");
@@ -37,7 +36,4 @@ function initializeScriptPage(scriptText) {
   });
 
   scriptTurns.replaceChildren(...turnElements);
-  chooseRoleButton.addEventListener("click", () => {
-    window.location.href = "/char";
-  });
 }
