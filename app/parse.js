@@ -203,8 +203,62 @@ function repeatedRoleCoverage(turns) {
   );
 }
 
+const HEADER_SECTION_PATTERN =
+  /^(등장\s?인물|나오는\s?사람들|만드는\s?사람들|배역|스태프|무대|때와\s?곳)$/;
+const SCENE_MARKER_PATTERN =
+  /^(제?\s?\d+\s?(막|장|씬)|프롤로그|에필로그|서막|S#|#\s?\d)/i;
+const HEADER_SKIP_CAP = 60;
+const HEADER_PREAMBLE_LIMIT = 50;
+
+// 극 서두의 소개 구간(등장인물·만드는 사람들·무대 설명)은 "이름  설명" 꼴이라
+// 구분자 파서가 배역·대사로 오인한다. 헤더 줄부터 막·장 표시 전까지 걷어낸다.
+// 안전판 둘: 막·장 표시를 실제로 만나야만 확정 폐기(못 만나면 전량 원복 —
+// 대사를 조용히 잃지 않는다), 헤더 감지는 서두에서만(본문 중간 "무대"는 무시).
+export function stripHeaderSections(lines) {
+  const kept = [];
+  let keptNonEmpty = 0;
+  let buffer = null;
+
+  const restoreBuffer = () => {
+    if (!buffer) return;
+    kept.push(...buffer.raw);
+    buffer = null;
+  };
+
+  for (const raw of lines) {
+    const line = raw.trim();
+
+    if (buffer) {
+      if (SCENE_MARKER_PATTERN.test(line)) {
+        buffer = null;
+        kept.push(raw);
+        keptNonEmpty += 1;
+        continue;
+      }
+      buffer.raw.push(raw);
+      if (line) buffer.count += 1;
+      if (buffer.count > HEADER_SKIP_CAP) restoreBuffer();
+      continue;
+    }
+
+    if (
+      HEADER_SECTION_PATTERN.test(line) &&
+      keptNonEmpty < HEADER_PREAMBLE_LIMIT
+    ) {
+      buffer = { raw: [raw], count: 0 };
+      continue;
+    }
+
+    kept.push(raw);
+    if (line) keptNonEmpty += 1;
+  }
+  restoreBuffer();
+
+  return kept;
+}
+
 export function parseScript(text) {
-  const lines = text.split("\n");
+  const lines = stripHeaderSections(text.split("\n"));
   const candidates = [
     ...DELIMITER_CANDIDATES.map((delimiter) =>
       parseWithDelimiter(lines, delimiter),

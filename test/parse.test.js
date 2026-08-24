@@ -425,3 +425,53 @@ test("콜론 대본은 연속 줄 첫 어절이 반복돼도 콜론 해석을 �
   assert.equal(turns.length, 8);
   assert.match(turns[0].text, /하지만 다음 줄로 이어진다/);
 });
+
+test("등장인물·무대 소개 구간은 장 표시 전까지 걷어내고 본문만 파싱한다", () => {
+  const lines = [
+    "전화벨이 울린다",
+    "이연주 作",
+    "등장인물",
+    "김수진  콜센터 상담원",
+    "박민규  연극배우",
+    "무대",
+    "주 무대는 콜센터와 고시원이다.",
+    "1장",
+  ];
+  for (let i = 0; i < 3; i += 1) {
+    lines.push(`수진  ${i}번째 대사예요.`);
+    lines.push(`민규  ${i}번째 답이에요.`);
+  }
+  const { roles, turns } = parseScript(lines.join("\n"));
+
+  assert.deepEqual(roles, ["수진", "민규"]);
+  assert.equal(turns.length, 6);
+  assert.ok(turns.every((turn) => !turn.text.includes("상담원")));
+});
+
+test("헤더 뒤에 막·장 표시가 없으면 아무것도 걷어내지 않는다", () => {
+  const lines = ["등장인물"];
+  for (let i = 0; i < 3; i += 1) {
+    lines.push(`수진: ${i}번째 대사.`);
+    lines.push(`민규: ${i}번째 답.`);
+  }
+  const { roles, turns } = parseScript(lines.join("\n"));
+
+  assert.deepEqual(roles, ["수진", "민규"]);
+  assert.equal(turns.length, 6);
+});
+
+test("본문 중간의 '무대' 한 줄은 소개 구간으로 오인하지 않는다", () => {
+  const lines = [];
+  for (let i = 0; i < 30; i += 1) {
+    lines.push(`수진: ${i}번째 대사.`);
+    lines.push(`민규: ${i}번째 답.`);
+  }
+  lines.push("무대");
+  for (let i = 30; i < 33; i += 1) {
+    lines.push(`수진: ${i}번째 대사.`);
+    lines.push(`민규: ${i}번째 답.`);
+  }
+  const { turns } = parseScript(lines.join("\n"));
+
+  assert.equal(turns.length, 66);
+});
