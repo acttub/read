@@ -9,8 +9,11 @@ const ZIP_SIGNATURE = Object.freeze({
 
 const GUIDANCE = Object.freeze({
   hwp: "한글에서 ‘다른 이름으로 저장’ → ‘HWPX’ 또는 ‘TXT’로 저장해 올려주세요.",
-  pdf: "PDF는 아직 못 읽어요. 텍스트를 복사해 붙여넣거나 TXT로 저장해 올려주세요.",
+  pdf: "이 PDF에는 복사할 수 있는 글자가 없어요. 화면의 대본을 텍스트로 붙여넣어 주세요.",
 });
+
+const PDF_WORKER_PATH = "/vendor/pdfjs/pdf.worker.min.mjs";
+const PDF_LINE_Y_TOLERANCE = 2;
 
 export class ScriptFileError extends Error {
   constructor(code, message) {
@@ -27,6 +30,46 @@ function asBytes(source) {
   }
   if (source instanceof ArrayBuffer) return new Uint8Array(source);
   throw new TypeError("ArrayBuffer 또는 ArrayBufferView가 필요합니다.");
+}
+
+// pdf.js와 무관한 좌표 배열만 받아 PDF의 시각적 행 순서를 텍스트 줄로 복원한다.
+export function restorePdfTextLines(items, yTolerance = PDF_LINE_Y_TOLERANCE) {
+  const numericTolerance = Number(yTolerance);
+  const tolerance =
+    Number.isFinite(numericTolerance) && numericTolerance >= 0
+      ? numericTolerance
+      : PDF_LINE_Y_TOLERANCE;
+  const positionedItems = Array.from(items ?? [], (item, index) => {
+    const x = Number(item?.x);
+    const y = Math.round(Number(item?.y));
+    const text = typeof item?.text === "string" ? item.text : "";
+    return Number.isFinite(x) && Number.isFinite(y) && text
+      ? { index, text, x, y }
+      : null;
+  })
+    .filter(Boolean)
+    .sort((left, right) => right.y - left.y || left.index - right.index);
+  const rows = [];
+
+  for (const item of positionedItems) {
+    const currentRow = rows.at(-1);
+    if (!currentRow || Math.abs(currentRow.y - item.y) > tolerance) {
+      rows.push({ y: item.y, items: [item] });
+    } else {
+      currentRow.items.push(item);
+    }
+  }
+
+  return rows
+    .map(({ items: rowItems }) =>
+      rowItems
+        .sort((left, right) => left.x - right.x || left.index - right.index)
+        .map(({ text }) => text)
+        .join("")
+        .trim(),
+    )
+    .filter(Boolean)
+    .join("\n");
 }
 
 function readUint16(view, offset, limit, context) {
@@ -79,17 +122,15 @@ export function routeScriptFile(fileLike) {
   if (extension === ".txt") return { kind: "parse", format: "txt" };
   if (extension === ".docx") return { kind: "parse", format: "docx" };
   if (extension === ".hwpx") return { kind: "parse", format: "hwpx" };
+  if (extension === ".pdf") return { kind: "parse", format: "pdf" };
   if (extension === ".hwp") {
     return { kind: "guidance", format: "hwp", message: GUIDANCE.hwp };
-  }
-  if (extension === ".pdf") {
-    return { kind: "guidance", format: "pdf", message: GUIDANCE.pdf };
   }
 
   return {
     kind: "error",
     code: "unsupported_format",
-    message: "TXT, DOCX, HWPX 파일을 열 수 있어요.",
+    message: "TXT, DOCX, HWPX, PDF 파일을 열 수 있어요.",
   };
 }
 
@@ -432,8 +473,43 @@ async function extractHwpxText(source, entries, dependencies) {
   return sections.join("\n");
 }
 
+async function extractPdfText(source, pdfjsModule) {
+  const pdfjs =
+    pdfjsModule ?? (await import("/vendor/pdfjs/pdf.min.mjs"));
+  pdfjs.GlobalWorkerOptions.workerSrc = PDF_WORKER_PATH;
+
+  const loadingTask = pdfjs.getDocument({ data: asBytes(source) });
+  const pdfDocument = await loadingTask.promise;
+
+  try {
+    const pages = [];
+    for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
+      const page = await pdfDocument.getPage(pageNumber);
+      const textContent = await page.getTextContent();
+      const positionedItems = textContent.items.map((item) => ({
+        text: item.str,
+        x: item.transform?.[4],
+        y: item.transform?.[5],
+      }));
+      pages.push(restorePdfTextLines(positionedItems));
+    }
+    return pages.join("\n").trim();
+  } finally {
+    if (typeof pdfDocument.destroy === "function") {
+      await Promise.resolve(pdfDocument.destroy()).catch(() => {});
+    }
+  }
+}
+
 function fileReadError(format) {
-  const label = format === "docx" ? "DOCX" : format === "hwpx" ? "HWPX" : "TXT";
+  const label =
+    format === "docx"
+      ? "DOCX"
+      : format === "hwpx"
+        ? "HWPX"
+        : format === "pdf"
+          ? "PDF"
+          : "TXT";
   return new ScriptFileError(
     "file_read_failed",
     `${label} 파일을 읽지 못했어요. 파일이 손상되지 않았는지 확인해 주세요.`,
@@ -461,6 +537,18 @@ export async function readScriptFile(file, dependencies = {}) {
         );
       }
       return { kind: "success", format: "txt", ...decoded };
+    }
+
+    if (route.format === "pdf") {
+      const text = await extractPdfText(source, dependencies.pdfjsModule);
+      if (!text.trim()) {
+        return {
+          kind: "guidance",
+          format: "pdf",
+          message: GUIDANCE.pdf,
+        };
+      }
+      return { kind: "success", format: "pdf", text, warning: "" };
     }
 
     const entries = parseZipCentralDirectory(source);

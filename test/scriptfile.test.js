@@ -10,6 +10,7 @@ import {
   getZipEntryCompressedData,
   parseZipCentralDirectory,
   readScriptFile,
+  restorePdfTextLines,
   routeScriptFile,
 } from "../app/scriptfile.js";
 import { parseScript } from "../app/parse.js";
@@ -67,7 +68,10 @@ test("지원 형식, 안내 형식, 5MB 상한을 구분한다", () => {
     format: "txt",
   });
   assert.equal(routeScriptFile({ name: "대본.hwp", size: 10 }).kind, "guidance");
-  assert.equal(routeScriptFile({ name: "대본.pdf", size: 10 }).kind, "guidance");
+  assert.deepEqual(routeScriptFile({ name: "대본.pdf", size: 10 }), {
+    kind: "parse",
+    format: "pdf",
+  });
   assert.equal(
     routeScriptFile({ name: "대본.txt", size: MAX_SCRIPT_FILE_BYTES + 1 }).code,
     "file_too_large",
@@ -154,7 +158,110 @@ test("TXT 파일 읽기 결과를 반환하고 빈 파일은 거부한다", asyn
   );
 });
 
-test("HWP/PDF 안내와 5MB 거부는 파일 본문을 읽지 않는다", async () => {
+test("PDF 행 복원은 y 역순 입력을 위에서부터 놓고 같은 행은 x 순서로 잇는다", () => {
+  const text = restorePdfTextLines([
+    { text: "두 번째 줄", x: 30, y: 70 },
+    { text: " 첫 대사", x: 80, y: 100.4 },
+    { text: "민수:", x: 20, y: 99.4 },
+    { text: "서연:", x: 10, y: 70 },
+  ]);
+
+  assert.equal(text, "민수: 첫 대사\n서연:두 번째 줄");
+});
+
+test("PDF를 페이지별로 읽어 복원하고 worker 경로를 지정한다", async () => {
+  const pages = [
+    [
+      { str: " 안녕", transform: [1, 0, 0, 1, 60, 90] },
+      { str: "민수:", transform: [1, 0, 0, 1, 10, 90] },
+    ],
+    [{ str: "서연: 반가워", transform: [1, 0, 0, 1, 10, 80] }],
+  ];
+  const pdfjsModule = {
+    GlobalWorkerOptions: {},
+    getDocument({ data }) {
+      assert.ok(data instanceof Uint8Array);
+      return {
+        promise: Promise.resolve({
+          numPages: pages.length,
+          async getPage(pageNumber) {
+            return {
+              async getTextContent() {
+                return { items: pages[pageNumber - 1] };
+              },
+            };
+          },
+        }),
+      };
+    },
+  };
+  const result = await readScriptFile(
+    {
+      name: "대본.pdf",
+      size: 4,
+      arrayBuffer: async () => new ArrayBuffer(4),
+    },
+    { pdfjsModule },
+  );
+
+  assert.deepEqual(result, {
+    kind: "success",
+    format: "pdf",
+    text: "민수: 안녕\n서연: 반가워",
+    warning: "",
+  });
+  assert.equal(
+    pdfjsModule.GlobalWorkerOptions.workerSrc,
+    "/vendor/pdfjs/pdf.worker.min.mjs",
+  );
+});
+
+test("글자가 없는 PDF는 붙여넣기 안내로 돌려보낸다", async () => {
+  const result = await readScriptFile(
+    {
+      name: "스캔본.pdf",
+      size: 4,
+      arrayBuffer: async () => new ArrayBuffer(4),
+    },
+    {
+      pdfjsModule: {
+        GlobalWorkerOptions: {},
+        getDocument: () => ({
+          promise: Promise.resolve({
+            numPages: 1,
+            getPage: async () => ({ getTextContent: async () => ({ items: [] }) }),
+          }),
+        }),
+      },
+    },
+  );
+
+  assert.equal(result.kind, "guidance");
+  assert.equal(result.format, "pdf");
+  assert.match(result.message, /복사할 수 있는 글자가 없어요/);
+  assert.match(result.message, /텍스트로 붙여넣어 주세요/);
+});
+
+test("깨진 PDF는 기존 파일 읽기 오류로 처리한다", async () => {
+  await assert.rejects(
+    readScriptFile(
+      {
+        name: "깨진.pdf",
+        size: 4,
+        arrayBuffer: async () => new ArrayBuffer(4),
+      },
+      {
+        pdfjsModule: {
+          GlobalWorkerOptions: {},
+          getDocument: () => ({ promise: Promise.reject(new Error("broken")) }),
+        },
+      },
+    ),
+    (error) => error.code === "file_read_failed" && /PDF 파일/.test(error.message),
+  );
+});
+
+test("HWP 안내와 5MB 거부는 파일 본문을 읽지 않는다", async () => {
   let readCount = 0;
   const arrayBuffer = async () => {
     readCount += 1;
@@ -162,15 +269,13 @@ test("HWP/PDF 안내와 5MB 거부는 파일 본문을 읽지 않는다", async 
   };
 
   const hwp = await readScriptFile({ name: "대본.hwp", size: 10, arrayBuffer });
-  const pdf = await readScriptFile({ name: "대본.pdf", size: 10, arrayBuffer });
   const tooLarge = await readScriptFile({
-    name: "대본.txt",
+    name: "대본.pdf",
     size: MAX_SCRIPT_FILE_BYTES + 1,
     arrayBuffer,
   });
 
   assert.match(hwp.message, /HWPX.*TXT/);
-  assert.match(pdf.message, /복사해 붙여넣거나 TXT/);
   assert.equal(tooLarge.code, "file_too_large");
   assert.equal(readCount, 0);
 });
