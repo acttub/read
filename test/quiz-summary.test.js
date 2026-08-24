@@ -19,10 +19,6 @@ const ELEMENT_IDS = [
   "lineDisplay",
   "differentWords",
   "actionArea",
-  "modeControls",
-  "voiceModeInput",
-  "silentModeInput",
-  "textModeInput",
   "voiceDisclosure",
   "textDisclosure",
   "modeNotice",
@@ -30,6 +26,7 @@ const ELEMENT_IDS = [
   "textAnswerInput",
   "textAnswerButton",
   "speakButton",
+  "textModeButton",
   "silentRecallButton",
   "nextButton",
   "retryButton",
@@ -193,6 +190,8 @@ class FakeElement {
   }
 
   scrollIntoView() {}
+
+  focus() {}
 }
 
 class FakeDocument {
@@ -424,12 +423,6 @@ test("quiz는 범위 밖 시작 지점을 0으로 처리한다", async () => {
   assert.equal(quiz.document.getElementById("quizRemaining").textContent, "20");
 });
 
-function selectMode(quiz, id) {
-  const input = quiz.document.getElementById(id);
-  input.checked = true;
-  input.change();
-}
-
 function submitText(quiz, value) {
   quiz.document.getElementById("textAnswerInput").value = value;
   quiz.document.getElementById("textAnswerForm").submit();
@@ -449,6 +442,39 @@ test("음성 완주에는 두 요약 지표를 표시한다", async () => {
   assert.match(summary.textContent, /100%발음 정확도/);
 });
 
+test("내 대사 차례에는 직접말하기·입력하기·다음이 함께 보인다", async () => {
+  const quiz = await startQuiz({ voice: true });
+
+  for (const id of ["speakButton", "textModeButton", "silentRecallButton"]) {
+    assert.equal(quiz.document.getElementById(id).hidden, false, id);
+  }
+  // 말하기 고지는 직접말하기를 누르기 전부터 읽혀야 한다
+  assert.equal(quiz.document.getElementById("voiceDisclosure").hidden, false);
+});
+
+test("말하기를 못 쓰는 기기에서는 입력하기와 다음만 남는다", async () => {
+  const quiz = await startQuiz();
+
+  assert.equal(quiz.document.getElementById("speakButton").hidden, true);
+  assert.equal(quiz.document.getElementById("textModeButton").hidden, false);
+  assert.equal(quiz.document.getElementById("silentRecallButton").hidden, false);
+  assert.equal(quiz.document.getElementById("voiceDisclosure").hidden, true);
+});
+
+test("입력하기 버튼은 입력 폼을 열고 눌린 상태로 표시된다", async () => {
+  const quiz = await startQuiz();
+  const textModeButton = quiz.document.getElementById("textModeButton");
+
+  assert.equal(textModeButton.getAttribute("aria-pressed"), "false");
+  textModeButton.click();
+
+  assert.equal(quiz.document.getElementById("textAnswerForm").hidden, false);
+  assert.equal(textModeButton.getAttribute("aria-pressed"), "true");
+  assert.equal(textModeButton.classList.names.has("is-active"), true);
+  // 폼을 열어도 세 버튼은 그대로 남는다
+  assert.equal(quiz.document.getElementById("silentRecallButton").hidden, false);
+});
+
 test("무음 완주에는 요약 지표 영역을 렌더하지 않는다", async () => {
   const quiz = await startQuiz();
 
@@ -463,7 +489,7 @@ test("무음 완주에는 요약 지표 영역을 렌더하지 않는다", async
 test("입력하기는 음성과 같은 느슨한 판정 경로를 타고 대사 지표만 표시한다", async () => {
   const quiz = await startQuiz({ script: "나: 나는 기다려" });
 
-  selectMode(quiz, "textModeInput");
+  quiz.document.getElementById("textModeButton").click();
   assert.equal(quiz.document.getElementById("textAnswerForm").hidden, false);
   assert.match(
     quiz.document.getElementById("textDisclosure").textContent,
@@ -484,7 +510,7 @@ test("입력하기는 음성과 같은 느슨한 판정 경로를 타고 대사 
 test("입력하기도 같은 줄이 두 번 미달하면 안내 없이 통과한다", async () => {
   const quiz = await startQuiz();
 
-  selectMode(quiz, "textModeInput");
+  quiz.document.getElementById("textModeButton").click();
   submitText(quiz, "힣");
   assert.equal(quiz.document.getElementById("retryButton").hidden, false);
   quiz.document.getElementById("retryButton").click();
@@ -504,11 +530,10 @@ test("입력과 음성을 섞으면 대사는 전체 시도, 발음은 음성 �
     transcripts: ["힣", "힣"],
   });
 
-  selectMode(quiz, "textModeInput");
+  quiz.document.getElementById("textModeButton").click();
   submitText(quiz, "가");
   quiz.runTimer(650);
 
-  selectMode(quiz, "voiceModeInput");
   quiz.document.getElementById("speakButton").click();
   await settle();
   quiz.document.getElementById("retryButton").click();

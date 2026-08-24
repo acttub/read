@@ -48,11 +48,6 @@
               <span><strong id="quizRemaining">—</strong><small>남은 대사</small></span>
               <span><strong id="quizElapsed" class="time-value">00:00</strong><small>경과 시간</small></span>
             </div>
-            <div id="modeControls" class="quiz-mode-controls" role="radiogroup" aria-label="암기 방식">
-              <label><input id="voiceModeInput" type="radio" name="quizMode" value="voice"><span>말하기</span></label>
-              <label><input id="silentModeInput" type="radio" name="quizMode" value="silent"><span>무음</span></label>
-              <label><input id="textModeInput" type="radio" name="quizMode" value="text"><span>입력하기</span></label>
-            </div>
           </div>
         </header>
         <div class="quiz-disclosures">
@@ -108,8 +103,9 @@
 
         <footer id="actionArea" class="session-controls quiz-actions" hidden>
           <div class="wide-action session-control-buttons">
-            <button id="speakButton" type="button" class="session-control-primary" hidden>말하기</button>
-            <button id="silentRecallButton" type="button" class="session-control-primary" hidden>떠올렸어요</button>
+            <button id="speakButton" type="button" class="session-control-primary" hidden>직접말하기</button>
+            <button id="textModeButton" type="button" class="session-control-secondary" aria-pressed="false" hidden>입력하기</button>
+            <button id="silentRecallButton" type="button" class="session-control-secondary" hidden>다음</button>
             <button id="nextButton" type="button" class="session-control-primary" hidden>넘어가기</button>
             <button id="retryButton" type="button" class="session-control-secondary" hidden>다시</button>
             <button id="overrideButton" type="button" class="session-control-secondary" hidden>맞게 말했는데</button>

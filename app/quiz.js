@@ -51,7 +51,7 @@ function initializeQuiz() {
     attempts: new Map(),
     scoredAttempts: [],
     hintWords: new Map(),
-    quizMode: !inAppBrowser && initialVoiceEngine !== null ? "voice" : "silent",
+    quizMode: "silent",
     voiceEngine: initialVoiceEngine,
   };
 
@@ -74,16 +74,13 @@ function initializeQuiz() {
   const lineDisplay = document.getElementById("lineDisplay");
   const differentWords = document.getElementById("differentWords");
   const actionArea = document.getElementById("actionArea");
-  const modeControls = document.getElementById("modeControls");
-  const voiceModeInput = document.getElementById("voiceModeInput");
-  const silentModeInput = document.getElementById("silentModeInput");
-  const textModeInput = document.getElementById("textModeInput");
   const voiceDisclosure = document.getElementById("voiceDisclosure");
   const textDisclosure = document.getElementById("textDisclosure");
   const modeNotice = document.getElementById("modeNotice");
   const textAnswerForm = document.getElementById("textAnswerForm");
   const textAnswerInput = document.getElementById("textAnswerInput");
   const speakButton = document.getElementById("speakButton");
+  const textModeButton = document.getElementById("textModeButton");
   const silentRecallButton = document.getElementById("silentRecallButton");
   const nextButton = document.getElementById("nextButton");
   const retryButton = document.getElementById("retryButton");
@@ -95,6 +92,7 @@ function initializeQuiz() {
   coreLink.href = withInboundAdId(coreLink.getAttribute("href"));
   const actionButtons = [
     speakButton,
+    textModeButton,
     silentRecallButton,
     nextButton,
     retryButton,
@@ -194,7 +192,7 @@ function initializeQuiz() {
 
   function resetSpeakButton() {
     speakButton.disabled = false;
-    speakButton.textContent = "말하기";
+    speakButton.textContent = "직접말하기";
     speakButton.classList.remove("animate-pulse");
   }
 
@@ -264,15 +262,19 @@ function initializeQuiz() {
   }
 
   function syncModeControls() {
-    voiceModeInput.checked = state.quizMode === "voice";
-    silentModeInput.checked = state.quizMode === "silent";
-    textModeInput.checked = state.quizMode === "text";
-    voiceDisclosure.hidden = state.quizMode !== "voice";
+    // 모드와 무관하게, 말하기를 켤 수 있으면 항상 보인다 — 이제 이 자리가 곧
+    // "직접말하기" 버튼을 누르기 전에 무엇이 어디로 나가는지 알리는 자리다.
+    voiceDisclosure.hidden = state.voiceEngine === null;
     textDisclosure.hidden = state.quizMode !== "text";
     voiceDisclosure.textContent = state.voiceEngine === "server"
       ? "말하기를 쓰면 말소리가 acttub 서버를 거쳐 OpenAI로 전송돼 글자로 바뀌어요. 바뀐 뒤 녹음은 바로 버려요."
       : "말하기를 쓰면 말소리가 브라우저 제공사 서버로 전송돼요.";
     textDisclosure.textContent = "대사를 쓰면 원문과 맞춰봐요.";
+    textModeButton.setAttribute(
+      "aria-pressed",
+      String(state.quizMode === "text"),
+    );
+    textModeButton.classList.toggle("is-active", state.quizMode === "text");
     syncTextAnswerForm();
 
     if (
@@ -280,13 +282,9 @@ function initializeQuiz() {
       currentTurn()?.role === myRole &&
       !isEffectiveDirection(currentTurn())
     ) {
-      const primaryAction = state.quizMode === "voice"
-        ? speakButton
-        : state.quizMode === "silent"
-        ? silentRecallButton
-        : null;
-      const actions = [hintButton, originalButton];
-      if (primaryAction) actions.unshift(primaryAction);
+      const actions = state.voiceEngine === null
+        ? [textModeButton, silentRecallButton, hintButton, originalButton]
+        : [speakButton, textModeButton, silentRecallButton, hintButton, originalButton];
       setOnlyActions(...actions);
     }
   }
@@ -804,7 +802,7 @@ function initializeQuiz() {
       instance.onend = null;
       clearRecognitionWatchdog();
       releaseMic();
-      speakButton.textContent = "말하기";
+      speakButton.textContent = "직접말하기";
       speakButton.classList.remove("animate-pulse");
     }
 
@@ -979,7 +977,6 @@ function initializeQuiz() {
     quizStage.hidden = false;
     completionState.hidden = true;
     emptyState.hidden = true;
-    modeControls.hidden = false;
     syncModeControls();
     updateProgress();
 
@@ -1033,7 +1030,6 @@ function initializeQuiz() {
     quizStage.hidden = true;
     emptyState.hidden = true;
     completionState.hidden = false;
-    modeControls.hidden = true;
     voiceDisclosure.hidden = true;
     textDisclosure.hidden = true;
     textAnswerForm.hidden = true;
@@ -1114,7 +1110,6 @@ function initializeQuiz() {
     quizStage.hidden = true;
     completionState.hidden = true;
     emptyState.hidden = false;
-    modeControls.hidden = true;
     voiceDisclosure.hidden = true;
     textDisclosure.hidden = true;
     textAnswerForm.hidden = true;
@@ -1123,15 +1118,6 @@ function initializeQuiz() {
     setOnlyActions();
   }
 
-  voiceModeInput.addEventListener("change", () => {
-    if (voiceModeInput.checked) setQuizMode("voice");
-  });
-  silentModeInput.addEventListener("change", () => {
-    if (silentModeInput.checked) setQuizMode("silent");
-  });
-  textModeInput.addEventListener("change", () => {
-    if (textModeInput.checked) setQuizMode("text");
-  });
   textAnswerForm.addEventListener("submit", (event) => {
     event.preventDefault();
     if (state.quizMode !== "text" || phase !== "ready") return;
@@ -1145,7 +1131,26 @@ function initializeQuiz() {
       textAnswerForm.scrollIntoView({ block: "center" });
     });
   });
-  speakButton.addEventListener("click", startRecognition);
+  speakButton.addEventListener("click", () => {
+    if (phase === "ready" && state.quizMode !== "voice") setQuizMode("voice");
+    // 녹음 중 "다 말했어요"로 다시 누르는 경로: phase가 recording이면 여기로
+    // 오지 않고 바로 startRecognition() → finishServerRecording()으로 간다.
+    if (state.quizMode !== "voice") return;
+    startRecognition();
+  });
+  textModeButton.addEventListener("click", () => {
+    const turn = currentTurn();
+    if (
+      phase !== "ready" ||
+      !turn ||
+      turn.role !== myRole ||
+      isEffectiveDirection(turn)
+    ) return;
+    setQuizMode("text");
+    window.requestAnimationFrame(() => {
+      textAnswerInput.focus();
+    });
+  });
   silentRecallButton.addEventListener("click", () => {
     flashOriginalAndAdvance();
   });
@@ -1213,9 +1218,6 @@ function initializeQuiz() {
   });
 
   scheduleSessionClock();
-  voiceModeInput.checked = state.quizMode === "voice";
-  silentModeInput.checked = state.quizMode === "silent";
-  textModeInput.checked = state.quizMode === "text";
   if (inAppBrowser) {
     setNotice("브라우저로 열면 말하기로도 할 수 있어요");
   }
