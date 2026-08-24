@@ -1,5 +1,5 @@
 import { parseScript, parseScriptWithRoles } from "./parse.js";
-import { findAiRoleResult } from "./ai-roles.js";
+import { createAiRoleLookup } from "./ai-roles.js";
 import { SAMPLE_SCRIPT } from "./sample-script.js";
 import { readScriptFile, ScriptFileError } from "./scriptfile.js";
 import { saveScript } from "./storage.js";
@@ -26,12 +26,12 @@ const roleLookupStatus = document.getElementById("roleLookupStatus");
 const manualRolesField = document.getElementById("manualRolesField");
 const manualRolesInput = document.getElementById("manualRolesInput");
 
-const AI_LOOKUP_DELAY_MS = 300;
+const DIRECT_INPUT_LOOKUP_DELAY_MS = 1000;
 const AI_METRICS_KEY = "read.aiRoleMetrics";
 const aiMetricsTrackedHere = new Set();
+const findAiRolesOnce = createAiRoleLookup(fetch);
 let aiLookup = { script: "", status: "idle", result: null };
 let aiLookupTimer = null;
-let aiLookupController = null;
 let aiLookupVersion = 0;
 
 // 페이지를 열자마자(아직 아무 것도 안 건드렸는데) 빈 textarea를 "틀렸다"고 빨간 글씨로
@@ -73,26 +73,19 @@ function cancelAiLookup() {
   aiLookupVersion += 1;
   if (aiLookupTimer !== null) clearTimeout(aiLookupTimer);
   aiLookupTimer = null;
-  aiLookupController?.abort();
-  aiLookupController = null;
   aiLookup = { script: "", status: "idle", result: null };
 }
 
-function startAiLookup(script) {
+function startAiLookup(script, delayMs = 0) {
   cancelAiLookup();
   const version = aiLookupVersion;
   aiLookup = { script, status: "loading", result: null };
 
-  aiLookupTimer = setTimeout(async () => {
+  const runLookup = async () => {
     aiLookupTimer = null;
-    const controller = new AbortController();
-    aiLookupController = controller;
-    const result = await findAiRoleResult(script, fetch, {
-      signal: controller.signal,
-    });
+    const result = await findAiRolesOnce(script);
 
     if (version !== aiLookupVersion || scriptInput.value !== script) return;
-    aiLookupController = null;
     aiLookup = {
       script,
       status: result ? "success" : "failed",
@@ -100,7 +93,10 @@ function startAiLookup(script) {
     };
     trackAiMetricOnce(result ? "ai_roles_used" : "ai_roles_failed");
     validateScript({ allowAiLookup: false });
-  }, AI_LOOKUP_DELAY_MS);
+  };
+
+  if (delayMs > 0) aiLookupTimer = setTimeout(runLookup, delayMs);
+  else void runLookup();
 }
 
 function manualRoleNames() {
@@ -134,7 +130,7 @@ function renderRoleChips(result) {
   roleChips.hidden = result.roles.length === 0;
 }
 
-function validateScript({ allowAiLookup = true } = {}) {
+function validateScript({ allowAiLookup = true, aiLookupDelayMs = 0 } = {}) {
   const script = scriptInput.value;
 
   if (!script.trim()) {
@@ -148,16 +144,6 @@ function validateScript({ allowAiLookup = true } = {}) {
   }
 
   const automaticResult = parseScript(script);
-  if (automaticResult.roles.length >= 2) {
-    cancelAiLookup();
-    showRoleLookupStatus();
-    manualRolesField.hidden = true;
-    renderRoleChips(automaticResult);
-    continueButton.disabled = false;
-    scriptError.textContent = "";
-    return true;
-  }
-
   const lookupMatches = aiLookup.script === script;
   if (lookupMatches && aiLookup.status === "success") {
     showRoleLookupStatus();
@@ -169,7 +155,7 @@ function validateScript({ allowAiLookup = true } = {}) {
   }
 
   if (lookupMatches && aiLookup.status === "loading") {
-    showRoleLookupStatus("배역을 찾는 중…");
+    showRoleLookupStatus("배역을 확인하는 중…");
     manualRolesField.hidden = true;
     renderRoleChips(automaticResult);
     continueButton.disabled = true;
@@ -178,8 +164,8 @@ function validateScript({ allowAiLookup = true } = {}) {
   }
 
   if (!lookupMatches && allowAiLookup) {
-    startAiLookup(script);
-    showRoleLookupStatus("배역을 찾는 중…");
+    startAiLookup(script, aiLookupDelayMs);
+    showRoleLookupStatus("배역을 확인하는 중…");
     manualRolesField.hidden = true;
     renderRoleChips(automaticResult);
     continueButton.disabled = true;
@@ -188,11 +174,22 @@ function validateScript({ allowAiLookup = true } = {}) {
   }
 
   showRoleLookupStatus();
+  if (automaticResult.roles.length >= 2) {
+    manualRolesField.hidden = true;
+    renderRoleChips(automaticResult);
+    continueButton.disabled = false;
+    scriptError.textContent = "";
+    return true;
+  }
+
   manualRolesField.hidden = false;
-  const result = parseScriptWithRoles(script, manualRoleNames());
+  const names = manualRoleNames();
+  const result = names.length > 0
+    ? parseScriptWithRoles(script, names)
+    : automaticResult;
   renderRoleChips(result);
 
-  if (result.roles.length === 0) {
+  if (names.length === 0 || result.roles.length === 0) {
     continueButton.disabled = true;
     scriptError.textContent =
       "배역 이름과 대사가 구분되어 있는지 확인해 주세요.";
@@ -206,12 +203,12 @@ function validateScript({ allowAiLookup = true } = {}) {
 
 function scriptForStorage() {
   const script = scriptInput.value;
-  if (parseScript(script).roles.length >= 2) return script;
+  const aiResult = aiLookup.script === script && aiLookup.status === "success"
+    ? aiLookup.result
+    : null;
+  if (!aiResult && parseScript(script).roles.length >= 2) return script;
 
-  const roleNames = aiLookup.script === script && aiLookup.status === "success"
-    ? aiLookup.result.roles
-    : manualRoleNames();
-  const { turns } = parseScriptWithRoles(script, roleNames);
+  const { turns } = aiResult || parseScriptWithRoles(script, manualRoleNames());
   // 이후 화면은 parseScript(readScript())로 같은 파서를 다시 쓴다. 직접 받은 이름으로
   // 찾은 턴만 기존 콜론 형식으로 정리해 저장하면 새 저장 키 없이 그 계약을 지킬 수 있다.
   return turns
@@ -353,7 +350,7 @@ scriptInput.addEventListener("input", () => {
   hasInteracted = true;
   showPasteGuidance();
   resizeScriptInput();
-  validateScript();
+  validateScript({ aiLookupDelayMs: DIRECT_INPUT_LOOKUP_DELAY_MS });
 });
 
 manualRolesInput.addEventListener("input", () => {

@@ -88,10 +88,17 @@ test("랜딩 히어로의 두 CTA는 같은 크기의 버튼으로 나란히 놓
 
 test("두 예시 입구가 같은 대본을 쓰고 사용 이벤트는 세션에서 한 번만 보낸다", async () => {
   const originalGlobals = new Map(
-    ["document", "getComputedStyle", "location", "navigator", "sessionStorage", "window"]
+    ["document", "fetch", "getComputedStyle", "location", "navigator", "sessionStorage", "window"]
       .map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]),
   );
   const sent = [];
+  const aiRequests = [];
+  const fallbackScript = [
+    "선우: 첫 대사",
+    "하린: 첫 답",
+    "선우: 둘째 대사",
+    "하린: 둘째 답",
+  ].join("\n");
 
   try {
     Object.defineProperties(globalThis, {
@@ -106,6 +113,9 @@ test("두 예시 입구가 같은 대본을 쓰고 사용 이벤트는 세션에
       navigator: {
         configurable: true,
         value: {
+          clipboard: {
+            readText: async () => fallbackScript,
+          },
           sendBeacon(url, body) {
             sent.push({ url, body });
             return true;
@@ -113,6 +123,23 @@ test("두 예시 입구가 같은 대본을 쓰고 사용 이벤트는 세션에
         },
       },
       sessionStorage: { configurable: true, value: makeSessionStorage() },
+    });
+
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      value: async (url, options) => {
+        const text = JSON.parse(options.body).text;
+        aiRequests.push({ url, text });
+        if (text === fallbackScript) {
+          return new Response(JSON.stringify({ error: "failed" }), {
+            status: 502,
+          });
+        }
+        return new Response(JSON.stringify({ roles: ["지우", "민준"] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      },
     });
 
     const homeDocument = makeDocument(["sampleScriptButton"]);
@@ -168,11 +195,38 @@ test("두 예시 입구가 같은 대본을 쓰고 사용 이벤트는 세션에
     assert.equal(inputDocument.elements.get("scriptInput").value, SAMPLE_SCRIPT);
     assert.equal(inputDocument.elements.get("emptyState").hidden, true);
     assert.equal(inputDocument.elements.get("inputState").hidden, false);
-    assert.equal(inputDocument.elements.get("continueButton").disabled, false);
+    assert.equal(inputDocument.elements.get("continueButton").disabled, true);
     assert.equal(inputDocument.elements.get("roleChips").children.length, 2);
+    assert.equal(
+      inputDocument.elements.get("roleLookupStatus").textContent,
+      "배역을 확인하는 중…",
+    );
+    assert.deepEqual(aiRequests, [
+      { url: "/api/parse-roles", text: SAMPLE_SCRIPT },
+    ]);
+
+    await new Promise(setImmediate);
+
+    assert.equal(inputDocument.elements.get("continueButton").disabled, false);
+    assert.equal(inputDocument.elements.get("roleLookupStatus").hidden, true);
 
     inputDocument.elements.get("continueButton").click();
     assert.equal(inputWindow.location.href, "/script");
+
+    inputDocument.elements.get("resetButton").click();
+    inputDocument.elements.get("sampleScriptButton").click();
+    await new Promise(setImmediate);
+    assert.equal(aiRequests.length, 1);
+
+    inputDocument.elements.get("resetButton").click();
+    await inputDocument.elements.get("pasteButton").click();
+    await new Promise(setImmediate);
+
+    assert.equal(aiRequests.length, 2);
+    assert.equal(aiRequests[1].text, fallbackScript);
+    assert.equal(inputDocument.elements.get("continueButton").disabled, false);
+    assert.equal(inputDocument.elements.get("roleChips").children.length, 2);
+    assert.equal(inputDocument.elements.get("roleLookupStatus").hidden, true);
 
     const payloads = await Promise.all(
       sent.map(async ({ body }) => JSON.parse(await body.text())),
