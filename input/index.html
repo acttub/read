@@ -93,6 +93,7 @@
                 aria-describedby="pasteGuidance scriptFileStatus scriptError"
               ></textarea>
             </section>
+            <p class="mb-0 mt-sm text-body-sm font-medium text-ink-sub">배역을 못 찾으면 대본이 acttub 서버를 거쳐 OpenAI로 전송돼 배역 이름을 찾아요. 처리 후 대본은 저장하지 않아요.</p>
             <p id="scriptFileStatus" class="mb-0 mt-sm text-body-sm font-medium text-ink-sub" aria-live="polite" hidden></p>
           </section>
 
@@ -101,6 +102,7 @@
               <div><h2 id="roleCardTitle">배역 정하기</h2><p>찾은 배역을 확인한 뒤 다음 단계에서 내 배역을 고릅니다.</p></div>
             </div>
             <div id="roleChips" class="role-preview-list" aria-live="polite" hidden></div>
+            <p id="roleLookupStatus" class="mb-0 mt-sm text-body-sm font-medium text-ink-sub" aria-live="polite" hidden></p>
             <div class="role-empty-copy"><span class="role-empty-icon" aria-hidden="true">◎</span><p>대본을 넣으면 배역과 대사 수가 여기에 나타나요.</p></div>
             <div id="manualRolesField" class="manual-role-field" hidden>
               <label for="manualRolesInput">배역 이름을 쉼표로 알려주세요</label>

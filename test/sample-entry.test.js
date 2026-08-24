@@ -144,6 +144,7 @@ test("두 예시 입구가 같은 대본을 쓰고 사용 이벤트는 세션에
       "scriptFileButtonText",
       "scriptFileStatus",
       "roleChips",
+      "roleLookupStatus",
       "manualRolesField",
       "manualRolesInput",
     ];

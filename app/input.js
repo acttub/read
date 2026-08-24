@@ -1,4 +1,5 @@
 import { parseScript, parseScriptWithRoles } from "./parse.js";
+import { findAiRoleResult } from "./ai-roles.js";
 import { SAMPLE_SCRIPT } from "./sample-script.js";
 import { readScriptFile, ScriptFileError } from "./scriptfile.js";
 import { saveScript } from "./storage.js";
@@ -21,8 +22,17 @@ const scriptFileButton = document.getElementById("scriptFileButton");
 const scriptFileButtonText = document.getElementById("scriptFileButtonText");
 const scriptFileStatus = document.getElementById("scriptFileStatus");
 const roleChips = document.getElementById("roleChips");
+const roleLookupStatus = document.getElementById("roleLookupStatus");
 const manualRolesField = document.getElementById("manualRolesField");
 const manualRolesInput = document.getElementById("manualRolesInput");
+
+const AI_LOOKUP_DELAY_MS = 300;
+const AI_METRICS_KEY = "read.aiRoleMetrics";
+const aiMetricsTrackedHere = new Set();
+let aiLookup = { script: "", status: "idle", result: null };
+let aiLookupTimer = null;
+let aiLookupController = null;
+let aiLookupVersion = 0;
 
 // 페이지를 열자마자(아직 아무 것도 안 건드렸는데) 빈 textarea를 "틀렸다"고 빨간 글씨로
 // 알리면 안 된다. 사용자가 한 번이라도 입력을 건드린 뒤에만 형식 오류를 보여준다.
@@ -31,6 +41,73 @@ let hasInteracted = false;
 function showPasteGuidance(message = "") {
   pasteGuidance.textContent = message;
   pasteGuidance.hidden = !message;
+}
+
+function showRoleLookupStatus(message = "") {
+  roleLookupStatus.textContent = message;
+  roleLookupStatus.hidden = !message;
+}
+
+function trackAiMetricOnce(name) {
+  if (aiMetricsTrackedHere.has(name)) return;
+
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(AI_METRICS_KEY) || "[]");
+    if (Array.isArray(stored) && stored.includes(name)) {
+      aiMetricsTrackedHere.add(name);
+      return;
+    }
+    sessionStorage.setItem(
+      AI_METRICS_KEY,
+      JSON.stringify([...(Array.isArray(stored) ? stored : []), name]),
+    );
+  } catch {
+    // 저장소를 쓸 수 없어도 현재 문서에서는 Set으로 중복을 막는다.
+  }
+
+  aiMetricsTrackedHere.add(name);
+  trackMetric(name);
+}
+
+function cancelAiLookup() {
+  aiLookupVersion += 1;
+  if (aiLookupTimer !== null) clearTimeout(aiLookupTimer);
+  aiLookupTimer = null;
+  aiLookupController?.abort();
+  aiLookupController = null;
+  aiLookup = { script: "", status: "idle", result: null };
+}
+
+function startAiLookup(script) {
+  cancelAiLookup();
+  const version = aiLookupVersion;
+  aiLookup = { script, status: "loading", result: null };
+
+  aiLookupTimer = setTimeout(async () => {
+    aiLookupTimer = null;
+    const controller = new AbortController();
+    aiLookupController = controller;
+    const result = await findAiRoleResult(script, fetch, {
+      signal: controller.signal,
+    });
+
+    if (version !== aiLookupVersion || scriptInput.value !== script) return;
+    aiLookupController = null;
+    aiLookup = {
+      script,
+      status: result ? "success" : "failed",
+      result,
+    };
+    trackAiMetricOnce(result ? "ai_roles_used" : "ai_roles_failed");
+    validateScript({ allowAiLookup: false });
+  }, AI_LOOKUP_DELAY_MS);
+}
+
+function manualRoleNames() {
+  return manualRolesInput.value
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
 }
 
 function renderRoleChips(result) {
@@ -57,11 +134,13 @@ function renderRoleChips(result) {
   roleChips.hidden = result.roles.length === 0;
 }
 
-function validateScript() {
+function validateScript({ allowAiLookup = true } = {}) {
   const script = scriptInput.value;
 
   if (!script.trim()) {
+    cancelAiLookup();
     renderRoleChips({ roles: [], turns: [] });
+    showRoleLookupStatus();
     manualRolesField.hidden = true;
     continueButton.disabled = true;
     scriptError.textContent = hasInteracted ? "대본을 붙여넣어 주세요." : "";
@@ -69,14 +148,48 @@ function validateScript() {
   }
 
   const automaticResult = parseScript(script);
-  manualRolesField.hidden = automaticResult.roles.length > 0;
-  const manualRoleNames = manualRolesInput.value
-    .split(",")
-    .map((name) => name.trim())
-    .filter(Boolean);
-  const result = automaticResult.roles.length > 0
-    ? automaticResult
-    : parseScriptWithRoles(script, manualRoleNames);
+  if (automaticResult.roles.length >= 2) {
+    cancelAiLookup();
+    showRoleLookupStatus();
+    manualRolesField.hidden = true;
+    renderRoleChips(automaticResult);
+    continueButton.disabled = false;
+    scriptError.textContent = "";
+    return true;
+  }
+
+  const lookupMatches = aiLookup.script === script;
+  if (lookupMatches && aiLookup.status === "success") {
+    showRoleLookupStatus();
+    manualRolesField.hidden = true;
+    renderRoleChips(aiLookup.result);
+    continueButton.disabled = false;
+    scriptError.textContent = "";
+    return true;
+  }
+
+  if (lookupMatches && aiLookup.status === "loading") {
+    showRoleLookupStatus("배역을 찾는 중…");
+    manualRolesField.hidden = true;
+    renderRoleChips(automaticResult);
+    continueButton.disabled = true;
+    scriptError.textContent = "";
+    return false;
+  }
+
+  if (!lookupMatches && allowAiLookup) {
+    startAiLookup(script);
+    showRoleLookupStatus("배역을 찾는 중…");
+    manualRolesField.hidden = true;
+    renderRoleChips(automaticResult);
+    continueButton.disabled = true;
+    scriptError.textContent = "";
+    return false;
+  }
+
+  showRoleLookupStatus();
+  manualRolesField.hidden = false;
+  const result = parseScriptWithRoles(script, manualRoleNames());
   renderRoleChips(result);
 
   if (result.roles.length === 0) {
@@ -93,12 +206,11 @@ function validateScript() {
 
 function scriptForStorage() {
   const script = scriptInput.value;
-  if (parseScript(script).roles.length > 0) return script;
+  if (parseScript(script).roles.length >= 2) return script;
 
-  const roleNames = manualRolesInput.value
-    .split(",")
-    .map((name) => name.trim())
-    .filter(Boolean);
+  const roleNames = aiLookup.script === script && aiLookup.status === "success"
+    ? aiLookup.result.roles
+    : manualRoleNames();
   const { turns } = parseScriptWithRoles(script, roleNames);
   // 이후 화면은 parseScript(readScript())로 같은 파서를 다시 쓴다. 직접 받은 이름으로
   // 찾은 턴만 기존 콜론 형식으로 정리해 저장하면 새 저장 키 없이 그 계약을 지킬 수 있다.
@@ -158,7 +270,9 @@ function showEmptyState() {
   scriptInput.value = "";
   manualRolesInput.value = "";
   hasInteracted = false;
+  cancelAiLookup();
   showPasteGuidance();
+  showRoleLookupStatus();
   showFileStatus("");
   validateScript();
   inputState.hidden = true;
