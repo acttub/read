@@ -12,6 +12,7 @@ import {
   readRoleParams,
   readScript,
   readSilenceSec,
+  readStartIndex,
   readVoiceId,
 } from "./storage.js";
 import { trackCore, trackEvent, trackMetric, trackTtsPlay } from "./tracking.js";
@@ -66,7 +67,7 @@ function initializePracticePage() {
   const SECONDARY_BUTTON_CLASS =
     "session-control-secondary";
 
-  let idx = 0;
+  let idx = readStartIndex(turns.length);
   let sessionActive = true;
   let started = false;
   let paused = true;
@@ -199,7 +200,7 @@ function initializePracticePage() {
       return;
     }
 
-    renderCurrentTurn(turns[0]);
+    renderCurrentTurn(turns[idx]);
     // "/char"에서 이미 "연습 시작"을 눌렀는데 여기서 또 눌러야 해서(iOS 발화 잠금 때문에
     // 불가피하다) 화면이 침묵하면 멈춘 것처럼 보인다. 알약과 힌트가 먼저 무엇을 눌러야
     // 하는지 말한다. 넘김 방식별 힌트("화면을 누르면 다음으로" 등)는 실제로 시작한 뒤에나

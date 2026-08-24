@@ -7,6 +7,7 @@ const STORAGE_KEYS = {
   engine: "read.engine",
   voiceId: "read.voiceId",
   mode: "read.mode",
+  startIndex: "read.startIndex",
 };
 
 const ADVANCE_MODES = new Set(["tap", "silence", "cue"]);
@@ -24,10 +25,48 @@ const MODES = new Set(["read", "quiz"]);
 
 export function saveScript(script) {
   sessionStorage.setItem(STORAGE_KEYS.script, script);
+  clearStartIndex();
 }
 
 export function readScript() {
   return sessionStorage.getItem(STORAGE_KEYS.script) || "";
+}
+
+function validStartIndex(raw, turnCount) {
+  if (raw === null || raw.trim() === "") return null;
+  const index = Number(raw);
+  return Number.isSafeInteger(index) &&
+      index >= 0 &&
+      Number.isSafeInteger(turnCount) &&
+      turnCount > 0 &&
+      index < turnCount
+    ? index
+    : null;
+}
+
+export function saveStartIndex(index) {
+  sessionStorage.setItem(
+    STORAGE_KEYS.startIndex,
+    Number.isSafeInteger(index) && index >= 0 ? String(index) : "0",
+  );
+}
+
+export function clearStartIndex() {
+  sessionStorage.setItem(STORAGE_KEYS.startIndex, "");
+}
+
+export function hasStartIndex(turnCount) {
+  return validStartIndex(
+    sessionStorage.getItem(STORAGE_KEYS.startIndex),
+    turnCount,
+  ) !== null;
+}
+
+export function readStartIndex(turnCount) {
+  return validStartIndex(
+    sessionStorage.getItem(STORAGE_KEYS.startIndex),
+    turnCount,
+  ) ?? 0;
 }
 
 export function savePracticeSettings({

@@ -9,6 +9,8 @@ const ELEMENT_IDS = [
   "reviewSection",
   "reviewList",
   "progressBar",
+  "quizRemaining",
+  "quizRemainingDesktop",
   "sceneLabel",
   "pastTurns",
   "futureMarker",
@@ -234,11 +236,12 @@ class FakeDocument {
   }
 }
 
-function makeStorage(script = "나: 가") {
+function makeStorage(script = "나: 가", startIndex = null) {
   const values = new Map([
     ["read.script", script],
     ["read.myRole", "나"],
   ]);
+  if (startIndex !== null) values.set("read.startIndex", String(startIndex));
   return {
     getItem(key) {
       return values.get(key) ?? null;
@@ -301,6 +304,7 @@ async function startQuiz({
   voice = false,
   serverFallback = false,
   script = "나: 가",
+  startIndex = null,
   transcripts = ["가"],
 } = {}) {
   const document = new FakeDocument();
@@ -347,7 +351,7 @@ async function startQuiz({
   setGlobal("window", window);
   setGlobal("location", location);
   setGlobal("navigator", navigator);
-  setGlobal("sessionStorage", makeStorage(script));
+  setGlobal("sessionStorage", makeStorage(script, startIndex));
   setGlobal("fetch", async (...args) => {
     fetchCalls.push(args);
     return {
@@ -374,6 +378,51 @@ async function startQuiz({
     },
   };
 }
+
+function makeLongScript(length) {
+  return Array.from({ length }, (_, index) =>
+    `${index % 2 === 0 ? "상대" : "나"}: ${index + 1}번째 대사`
+  ).join("\n");
+}
+
+test("quiz는 저장한 시작 지점부터 출발하고 과거 문맥을 12개로 제한한다", async () => {
+  const quiz = await startQuiz({
+    script: makeLongScript(40),
+    startIndex: 20,
+  });
+
+  assert.equal(quiz.document.getElementById("roleName").textContent, "상대");
+  assert.equal(
+    quiz.document.getElementById("lineDisplay").textContent,
+    "21번째 대사",
+  );
+  assert.equal(quiz.document.getElementById("quizRemaining").textContent, "20");
+
+  const past = quiz.document.getElementById("pastTurns");
+  assert.equal(past.childElementCount, 12);
+  assert.match(past.children[0].textContent, /9번째 대사/);
+  assert.match(past.children[11].textContent, /20번째 대사/);
+
+  quiz.document.getElementById("nextButton").click();
+  assert.equal(past.childElementCount, 12);
+  assert.match(past.children[0].textContent, /10번째 대사/);
+  assert.match(past.children[11].textContent, /21번째 대사/);
+});
+
+test("quiz는 범위 밖 시작 지점을 0으로 처리한다", async () => {
+  const quiz = await startQuiz({
+    script: makeLongScript(20),
+    startIndex: 20,
+  });
+
+  assert.equal(quiz.document.getElementById("roleName").textContent, "상대");
+  assert.equal(
+    quiz.document.getElementById("lineDisplay").textContent,
+    "1번째 대사",
+  );
+  assert.equal(quiz.document.getElementById("pastTurns").childElementCount, 0);
+  assert.equal(quiz.document.getElementById("quizRemaining").textContent, "20");
+});
 
 function selectMode(quiz, id) {
   const input = quiz.document.getElementById(id);

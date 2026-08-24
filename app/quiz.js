@@ -5,7 +5,7 @@ import {
   summarizeAttempts,
 } from "./match.js";
 import { parseScript } from "./parse.js";
-import { readMyRole, readScript } from "./storage.js";
+import { readMyRole, readScript, readStartIndex } from "./storage.js";
 import { trackMetric, withInboundAdId } from "./tracking.js";
 
 const TRANSCRIBE_AUDIO_TYPES = new Set([
@@ -15,6 +15,7 @@ const TRANSCRIBE_AUDIO_TYPES = new Set([
   "audio/wav",
   "audio/ogg",
 ]);
+const PAST_TURN_CONTEXT_LIMIT = 12;
 
 // 괄호를 지우고도 말이 남으면 대사다 — parse.js의 startsWith("(") 오분류를 quiz에서만 바로잡는다
 const isEffectiveDirection = (turn) =>
@@ -45,7 +46,7 @@ function initializeQuiz() {
     ? "browser"
     : null;
   const state = {
-    index: 0,
+    index: readStartIndex(turns.length),
     status: new Map(),
     attempts: new Map(),
     scoredAttempts: [],
@@ -943,16 +944,14 @@ function initializeQuiz() {
   }
 
   function renderPastTurns() {
-    // 보통은 한 턴 전진이라 그 하나만 붙인다 — 긴 대본에서 매 턴 전체를 다시
-    // 그리면 O(N²)이다. 전체 재구성은 재연습으로 뒤로 점프했을 때만.
-    const rendered = pastTurns.childElementCount;
-    if (state.index === rendered) return;
-    if (state.index === rendered + 1) {
-      pastTurns.append(makePastTurn(turns[state.index - 1]));
-      return;
-    }
+    // 시작 지점이 뒤쪽이어도 앞선 대사 전체를 DOM으로 만들지 않는다. 현재 턴에
+    // 가까운 몇 줄만 문맥으로 유지하면 매 렌더 비용도 일정하다.
     const fragment = document.createDocumentFragment();
-    for (let index = 0; index < state.index; index += 1) {
+    const firstContextIndex = Math.max(
+      0,
+      state.index - PAST_TURN_CONTEXT_LIMIT,
+    );
+    for (let index = firstContextIndex; index < state.index; index += 1) {
       fragment.append(makePastTurn(turns[index]));
     }
     pastTurns.replaceChildren(fragment);
