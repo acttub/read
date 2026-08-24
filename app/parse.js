@@ -19,21 +19,36 @@ function makeTurn(roleText, dialogueText) {
   };
 }
 
+function isStandaloneDirection(line) {
+  return line.startsWith("(") && line.endsWith(")");
+}
+
+function appendContinuation(turn, line) {
+  if (!turn || isStandaloneDirection(line)) return;
+  turn.text = turn.text ? `${turn.text}\n${line}` : line;
+}
+
 function parseWithDelimiter(lines, delimiter) {
   const turns = [];
 
   for (const raw of lines) {
     const line = raw.trim();
     if (!line) continue;
+    if (isStandaloneDirection(line)) continue;
 
     const match = line.match(delimiter);
-    if (!match || match.index === undefined) continue;
+    const turn = match && match.index !== undefined
+      ? makeTurn(
+        line.slice(0, match.index),
+        line.slice(match.index + match[0].length),
+      )
+      : null;
+    if (turn) {
+      turns.push(turn);
+      continue;
+    }
 
-    const turn = makeTurn(
-      line.slice(0, match.index),
-      line.slice(match.index + match[0].length),
-    );
-    if (turn) turns.push(turn);
+    appendContinuation(turns[turns.length - 1], line);
   }
 
   return turns;
@@ -45,7 +60,11 @@ function parseWithNameLines(lines) {
 
   for (let index = 0; index < nonEmptyLines.length - 1; index += 1) {
     const role = nonEmptyLines[index];
-    if (role.length > 12 || /[.!?…]$/.test(role)) continue;
+    if (
+      isStandaloneDirection(role) ||
+      role.length > 12 ||
+      /[.!?…]$/.test(role)
+    ) continue;
 
     candidateCounts.set(role, (candidateCounts.get(role) || 0) + 1);
   }
@@ -72,18 +91,26 @@ function parseWithNameLines(lines) {
       .map(([role]) => role),
   );
   const turns = [];
+  let current = null;
 
-  for (let index = 0; index < nonEmptyLines.length - 1; index += 1) {
-    const role = nonEmptyLines[index];
-    const text = nonEmptyLines[index + 1];
-    if (!confirmedRoles.has(role)) continue;
-
-    const turn = makeTurn(role, text);
-    if (!turn) continue;
-
-    turns.push(turn);
-    index += 1;
+  function finishCurrent() {
+    if (!current) return;
+    const turn = makeTurn(current.role, current.text);
+    if (turn) turns.push(turn);
+    current = null;
   }
+
+  for (const line of nonEmptyLines) {
+    if (isStandaloneDirection(line)) continue;
+    if (confirmedRoles.has(line)) {
+      finishCurrent();
+      current = { role: line, text: "" };
+      continue;
+    }
+
+    appendContinuation(current, line);
+  }
+  finishCurrent();
 
   return turns;
 }

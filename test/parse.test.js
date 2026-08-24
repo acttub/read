@@ -61,6 +61,92 @@ test("이름과 대사가 한 줄씩 나뉜 형식을 감지한다", () => {
   ]);
 });
 
+test("콜론 형식의 세 줄 대사를 줄바꿈으로 이어 붙인다", () => {
+  const result = parseScript([
+    "건우: 이 대사는 한 줄에서 끝나지 않고",
+    "둘째 줄까지 이어진 다음",
+    "셋째 줄에서 끝나.",
+    "서연: 전부 들었어.",
+    "건우: 다행이다.",
+  ].join("\n"));
+
+  assert.equal(
+    result.turns[0].text,
+    "이 대사는 한 줄에서 끝나지 않고\n둘째 줄까지 이어진 다음\n셋째 줄에서 끝나.",
+  );
+});
+
+test("PDF에서 시각적으로 나뉜 공백 구분 대사를 복원한다", () => {
+  const result = parseScript([
+    "민수  PDF에서 복사한 문장이",
+    "페이지 폭에 맞춰 여러 줄로",
+    "쪼개져 있어도 하나의 대사야.",
+    "영희  이제 빠지지 않겠네.",
+    "민수  그래.",
+  ].join("\n"));
+
+  assert.equal(
+    result.turns[0].text,
+    "PDF에서 복사한 문장이\n페이지 폭에 맞춰 여러 줄로\n쪼개져 있어도 하나의 대사야.",
+  );
+});
+
+test("탭 형식의 구분자 없는 줄을 직전 대사에 이어 붙인다", () => {
+  const result = parseScript([
+    "건우\t첫 줄이야.",
+    "이 줄도 같은 대사야.",
+    "서연\t알겠어.",
+    "건우\t다음 대사야.",
+  ].join("\n"));
+
+  assert.equal(result.turns[0].text, "첫 줄이야.\n이 줄도 같은 대사야.");
+});
+
+test("이름 한 줄 형식의 연속 줄을 다음 배역 전까지 이어 붙인다", () => {
+  const result = parseScript([
+    "건우",
+    "첫 줄이야.",
+    "(숨을 고른다)",
+    "둘째 줄도 같은 대사고",
+    "셋째 줄에서 끝나.",
+    "서연",
+    "알겠어.",
+    "건우",
+    "다음 대사야.",
+    "서연",
+    "응.",
+  ].join("\n"));
+
+  assert.equal(
+    result.turns[0].text,
+    "첫 줄이야.\n둘째 줄도 같은 대사고\n셋째 줄에서 끝나.",
+  );
+});
+
+test("배역 없는 독립 괄호 지문 줄은 연속 대사에서 제외한다", () => {
+  const result = parseScript([
+    "건우: 첫 줄이야.",
+    "(잠시: 창밖을 본다)",
+    "둘째 줄이야.",
+    "서연: 알겠어.",
+    "건우: 다음 대사야.",
+  ].join("\n"));
+
+  assert.equal(result.turns[0].text, "첫 줄이야.\n둘째 줄이야.");
+});
+
+test("첫 배역 턴 이전의 씬 헤딩은 무시한다", () => {
+  const result = parseScript([
+    "S#3. 카페 안",
+    "건우: 먼저 도착했네.",
+    "서연: 오래 기다렸어?",
+    "건우: 아니, 방금 왔어.",
+  ].join("\n"));
+
+  assert.equal(result.turns[0].text, "먼저 도착했네.");
+  assert.equal(result.turns.some(({ text }) => text.includes("S#3")), false);
+});
+
 test("이름 한 줄 형식에서 1회성 장면 표시를 배역으로 잡지 않는다", () => {
   const result = parseScript([
     "밤",
@@ -144,7 +230,7 @@ test("배역명보다 짧은 대답도 이름 한 줄 형식으로 잡는다", (
   );
 });
 
-test("채택한 구분자가 없는 서술 줄은 turn에 넣지 않는다", () => {
+test("첫 턴 이전 서술은 무시하고 대사 사이 서술은 직전 턴에 잇는다", () => {
   const result = parseScript([
     "무대 중앙에 오래된 의자가 놓여 있다.",
     "건우: 지금 무슨 소릴 하는 거야.",
@@ -154,6 +240,10 @@ test("채택한 구분자가 없는 서술 줄은 turn에 넣지 않는다", () 
 
   assert.equal(result.turns.length, 2);
   assert.ok(result.turns.every(({ role }) => role === "건우"));
+  assert.equal(
+    result.turns[0].text,
+    "지금 무슨 소릴 하는 거야.\n조명이 천천히 어두워진다.",
+  );
 });
 
 test("반복 배역이 많은 탭을 채택하고 1회성 크레딧도 보존한다", () => {
