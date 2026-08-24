@@ -404,7 +404,7 @@ test("무음 완주에는 요약 지표 영역을 렌더하지 않는다", async
   const quiz = await startQuiz();
 
   quiz.document.getElementById("silentRecallButton").click();
-  quiz.document.getElementById("nextButton").click();
+  quiz.runTimer(650);
 
   const summary = quiz.document.getElementById("summaryMetrics");
   assert.equal(summary.hidden, true);

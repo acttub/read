@@ -391,16 +391,21 @@ function initializeQuiz() {
     renderTurn();
   }
 
-  function showPassed() {
+  function flashOriginalAndAdvance() {
     const turn = currentTurn();
     if (!turn) return;
-    markPassed(state.index);
     phase = "passing";
     syncTextAnswerForm();
     setLine(turn.text);
     differentWords.hidden = true;
     setOnlyActions();
     passTimer = window.setTimeout(advanceTurn, 650);
+  }
+
+  function showPassed() {
+    if (!currentTurn()) return;
+    markPassed(state.index);
+    flashOriginalAndAdvance();
   }
 
   function handleRecognitionResults(transcripts, source = "voice") {
@@ -1143,7 +1148,7 @@ function initializeQuiz() {
   });
   speakButton.addEventListener("click", startRecognition);
   silentRecallButton.addEventListener("click", () => {
-    showOriginal({ remember: false });
+    flashOriginalAndAdvance();
   });
   hintButton.addEventListener("click", () => {
     const turn = currentTurn();
