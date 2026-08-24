@@ -770,6 +770,15 @@ button {
   justify-content: center;
 }
 
+.script-review-actions-top {
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+.script-review-actions-top .button-primary {
+  text-align: center;
+}
+
 .char-shell {
   padding-bottom: calc(164px + var(--safe-bottom));
 }
