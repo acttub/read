@@ -169,6 +169,38 @@ test("PDF 행 복원은 y 역순 입력을 위에서부터 놓고 같은 행은 
   assert.equal(text, "민수: 첫 대사\n서연:두 번째 줄");
 });
 
+test("PDF 행 복원은 조각 사이 x 간격만큼 공백을 복원한다 — 칸 구분은 두 칸", () => {
+  const text = restorePdfTextLines([
+    { text: "지우", x: 10, y: 100, width: 20 },
+    { text: "나는 오늘 무대에 선다", x: 60, y: 100, width: 120 },
+    { text: "민준", x: 10, y: 80, width: 20 },
+    { text: "괜찮아", x: 33, y: 80, width: 40 },
+    { text: "붙은", x: 10, y: 60, width: 20 },
+    { text: "조각", x: 30.5, y: 60, width: 20 },
+  ]);
+
+  assert.equal(text, "지우  나는 오늘 무대에 선다\n민준 괜찮아\n붙은조각");
+});
+
+test("PDF 행 복원은 넓은 공백 글리프 아이템을 칸 구분 두 칸으로 바꾼다", () => {
+  const text = restorePdfTextLines([
+    { text: "지우", x: 36, y: 100, width: 18 },
+    { text: " ", x: 54, y: 100, width: 50 },
+    { text: "나는 오늘 무대에 선다", x: 91, y: 100, width: 236 },
+  ]);
+
+  assert.equal(text, "지우  나는 오늘 무대에 선다");
+});
+
+test("PDF 행 복원 간격 판정은 글자 크기에 비례한다", () => {
+  const text = restorePdfTextLines([
+    { text: "큰제목", x: 10, y: 100, width: 60, height: 20 },
+    { text: "이어짐", x: 80, y: 100, width: 60, height: 20 },
+  ]);
+
+  assert.equal(text, "큰제목 이어짐");
+});
+
 test("PDF를 페이지별로 읽어 복원하고 worker 경로를 지정한다", async () => {
   const pages = [
     [

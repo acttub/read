@@ -14,6 +14,11 @@ const GUIDANCE = Object.freeze({
 
 const PDF_WORKER_PATH = "/vendor/pdfjs/pdf.worker.min.mjs";
 const PDF_LINE_Y_TOLERANCE = 2;
+// 간격 판정은 이웃 글자 크기(em) 기준 — 절대 좌표 임계값은 PDF 스케일에 따라
+// 자간을 단어 공백으로, 정렬 공백을 칸 구분으로 오판한다(Codex 리뷰 P2 반영).
+const PDF_WORD_GAP_EM = 0.15;
+const PDF_COLUMN_GAP_EM = 0.8;
+const PDF_FALLBACK_FONT_SIZE = 10;
 
 export class ScriptFileError extends Error {
   constructor(code, message) {
@@ -43,8 +48,12 @@ export function restorePdfTextLines(items, yTolerance = PDF_LINE_Y_TOLERANCE) {
     const x = Number(item?.x);
     const y = Math.round(Number(item?.y));
     const text = typeof item?.text === "string" ? item.text : "";
+    const rawWidth = Number(item?.width);
+    const width = Number.isFinite(rawWidth) && rawWidth > 0 ? rawWidth : 0;
+    const rawHeight = Number(item?.height);
+    const height = Number.isFinite(rawHeight) && rawHeight > 0 ? rawHeight : 0;
     return Number.isFinite(x) && Number.isFinite(y) && text
-      ? { index, text, x, y }
+      ? { index, text, x, y, width, height }
       : null;
   })
     .filter(Boolean)
@@ -60,14 +69,40 @@ export function restorePdfTextLines(items, yTolerance = PDF_LINE_Y_TOLERANCE) {
     }
   }
 
+  // 조각 사이 간격을 공백으로 복원한다 — 이름 칸과 대사 칸이 같은 시각적 행에
+  // 놓인 대본에서 구분자가 사라지는 것을 막는다. 칸 구분 수준(넓은 간격이나
+  // 넓은 공백 글리프)은 공백 두 칸으로 만들어 파서의 "공백 2칸" 구분자에 걸리게 한다.
   return rows
-    .map(({ items: rowItems }) =>
-      rowItems
-        .sort((left, right) => left.x - right.x || left.index - right.index)
-        .map(({ text }) => text)
-        .join("")
-        .trim(),
-    )
+    .map(({ items: rowItems }) => {
+      const sorted = rowItems.sort(
+        (left, right) => left.x - right.x || left.index - right.index,
+      );
+      let line = "";
+      let previousEnd = null;
+      let previousHeight = 0;
+      let pendingSeparator = "";
+      for (const { text, x, width, height } of sorted) {
+        const fontSize =
+          Math.max(previousHeight, height) || PDF_FALLBACK_FONT_SIZE;
+        if (text.trim() === "") {
+          pendingSeparator = width > PDF_COLUMN_GAP_EM * fontSize ? "  " : " ";
+          if (width > 0) previousEnd = x + width;
+          continue;
+        }
+        const gap = previousEnd !== null ? x - previousEnd : 0;
+        if (!pendingSeparator && gap > PDF_WORD_GAP_EM * fontSize) {
+          pendingSeparator = gap > PDF_COLUMN_GAP_EM * fontSize ? "  " : " ";
+        }
+        if (line && pendingSeparator) {
+          line = line.replace(/ +$/, "") + pendingSeparator;
+        }
+        line += text;
+        pendingSeparator = "";
+        previousEnd = width > 0 ? x + width : null;
+        previousHeight = height;
+      }
+      return line.trim();
+    })
     .filter(Boolean)
     .join("\n");
 }
@@ -490,6 +525,8 @@ async function extractPdfText(source, pdfjsModule) {
         text: item.str,
         x: item.transform?.[4],
         y: item.transform?.[5],
+        width: item.width,
+        height: item.height,
       }));
       pages.push(restorePdfTextLines(positionedItems));
     }
