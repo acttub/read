@@ -355,3 +355,73 @@ test("배역 이름으로 시작할 뿐인 대사 줄을 배역 줄로 자르지
     ["건우", "서연은 아직 안 왔다고 들었는데.\n서연이가 그렇게 말했어?"],
   ]);
 });
+
+test("단일 공백 형식은 첫 어절이 3회 이상 반복되는 이름만 배역으로 확정한다", () => {
+  const script = [
+    "등장인물",
+    "카투리안 - 이은서",
+    "투폴스키 - 김가하",
+    "1막 1장",
+    "경찰 취조실. 테이블이 놓여 있다.",
+    "투폴스키 카투리안씨, 이쪽은 아리엘 형사요. 누가 이렇게",
+    "씌워 놓고 간 거요?",
+    "카투리안 뭘 말입니까?",
+    "투폴스키가 눈가리개를 벗긴다.",
+    "투폴스키 누가 씌워 놓고 갔냐고요?",
+    "카투리안 어, 어떤 남자가요.",
+    "투폴스키 왜 안 풀었어요?",
+    "카투리안 그게, 무서웠어요.",
+  ].join("\n");
+
+  const { roles, turns } = parseScript(script);
+
+  assert.deepEqual(roles, ["투폴스키", "카투리안"]);
+  assert.equal(turns.length, 6);
+  assert.equal(
+    turns[0].text,
+    "카투리안씨, 이쪽은 아리엘 형사요. 누가 이렇게\n씌워 놓고 간 거요?",
+  );
+  assert.equal(
+    turns[1].text,
+    "뭘 말입니까?\n투폴스키가 눈가리개를 벗긴다.",
+  );
+});
+
+test("접두 관계의 실제 배역 쌍은 살리고 조사 확장형만 지운다", () => {
+  const lines = [];
+  for (let i = 0; i < 4; i += 1) {
+    lines.push(`왕 ${i}번째 명이다.`);
+    lines.push(`왕비 ${i}번째 답이다.`);
+  }
+  lines.push("왕이 옥좌에서 일어난다.");
+  const { roles } = parseScript(lines.join("\n"));
+
+  assert.deepEqual(roles, ["왕", "왕비"]);
+});
+
+test("본문 중간의 캐스트 목록 줄은 대사에 붙이지 않고 건너뛴다", () => {
+  const lines = [];
+  for (let i = 0; i < 3; i += 1) {
+    lines.push(`민수 ${i}번째 대사다.`);
+    lines.push(`영지 ${i}번째 답이다.`);
+  }
+  lines.push("민수 - 김배우");
+  const { turns } = parseScript(lines.join("\n"));
+
+  assert.equal(turns.length, 6);
+  assert.ok(turns.every((turn) => !turn.text.includes("김배우")));
+});
+
+test("콜론 대본은 연속 줄 첫 어절이 반복돼도 콜론 해석을 유지한다", () => {
+  const lines = [];
+  for (let i = 0; i < 4; i += 1) {
+    lines.push(`지우: ${i}번째 대사인데 말이 길어서`);
+    lines.push("하지만 다음 줄로 이어진다.");
+    lines.push(`민준: ${i}번째 답.`);
+  }
+  const { roles, turns } = parseScript(lines.join("\n"));
+
+  assert.deepEqual(roles, ["지우", "민준"]);
+  assert.equal(turns.length, 8);
+  assert.match(turns[0].text, /하지만 다음 줄로 이어진다/);
+});
