@@ -6,7 +6,9 @@ import {
 } from "./match.js";
 import { parseScript } from "./parse.js";
 import { readMyRole, readScript, readStartIndex } from "./storage.js";
-import { trackMetric, withInboundAdId } from "./tracking.js";
+import { trackMetric, trackVisit, withInboundAdId } from "./tracking.js";
+
+trackVisit();
 
 const TRANSCRIBE_AUDIO_TYPES = new Set([
   "audio/webm",

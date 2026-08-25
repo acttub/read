@@ -3,7 +3,9 @@ import { createAiRoleLookup } from "./ai-roles.js";
 import { SAMPLE_SCRIPT } from "./sample-script.js";
 import { readScriptFile, ScriptFileError } from "./scriptfile.js";
 import { saveScript } from "./storage.js";
-import { trackEvent, trackMetric } from "./tracking.js";
+import { trackEvent, trackMetric, trackVisit } from "./tracking.js";
+
+trackVisit();
 
 trackEvent("landing_view");
 

@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { afterEach, beforeEach, test } from "node:test";
 import vm from "node:vm";
 
-import { trackCore, trackEvent, trackTtsPlay } from "../app/tracking.js";
+import { trackCore, trackEvent, trackTtsPlay, trackVisit } from "../app/tracking.js";
 
 const originalGlobals = new Map(
   ["location", "navigator", "fetch", "sessionStorage"].map((key) => [
@@ -257,4 +257,49 @@ test("인바운드 광고 식별자가 없으면 코어 링크는 그대로 둔�
     "https://acttub.com/?utm_source=read&utm_medium=subproject&utm_campaign=read_quiz";
 
   assert.equal(tracking.withInboundAdId(coreHref), coreHref);
+});
+
+/* 쿠키 없이 도는 앱이라 GA4가 방문을 세지 못한다. ops의 서브프로젝트 방문자 칸은
+   이 `visit` 하나에 걸려 있으므로, 진입 페이지가 늘었는데 호출을 빠뜨리면 그 칸이
+   조용히 작아진다 — 소스로 못을 박아 둔다. */
+test("진입 스크립트 여섯 개가 모두 방문을 센다", async () => {
+  for (const page of ["home", "input", "script", "char", "prac", "quiz"]) {
+    const source = await readFile(new URL(`../app/${page}.js`, import.meta.url), "utf8");
+    assert.match(source, /\btrackVisit\(\)/, `${page}.js가 trackVisit()을 부르지 않는다`);
+  }
+});
+
+test("방문은 페이지를 옮겨 다녀도 세션당 한 번만 보낸다", async () => {
+  const sent = [];
+  setGlobal("navigator", {
+    sendBeacon(url, body) {
+      sent.push({ url, body });
+      return true;
+    },
+  });
+
+  trackVisit();
+  const charTracking = await importTrackingForPage("char");
+  charTracking.trackVisit();
+  const quizTracking = await importTrackingForPage("quiz");
+  quizTracking.trackVisit();
+
+  assert.equal(sent.length, 1);
+  const payload = JSON.parse(await sent[0].body.text());
+  assert.equal(payload.name, "visit");
+  assert.equal(payload.app, "read");
+});
+
+test("location이 없는 환경에서는 방문을 보내지 않고 조용히 넘어간다", () => {
+  Reflect.deleteProperty(globalThis, "location");
+  let called = false;
+  setGlobal("navigator", {
+    sendBeacon() {
+      called = true;
+      return true;
+    },
+  });
+
+  assert.doesNotThrow(() => trackVisit());
+  assert.equal(called, false);
 });

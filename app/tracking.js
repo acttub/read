@@ -35,6 +35,9 @@ export function withInboundAdId(href) {
 }
 
 function isProductionHost() {
+  // 진입 스크립트가 모듈 최상위에서 trackVisit()을 부르므로 `location`이 없는
+  // 환경(노드 테스트 하네스)에서도 안전해야 한다 — captureInboundUpstream과 같은 방어다.
+  if (typeof location === "undefined") return false;
   return /(^|\.)acttub\.com$/.test(location.hostname);
 }
 
@@ -96,6 +99,21 @@ export function trackEvent(name) {
     name,
     at: new Date().toISOString(),
   });
+}
+
+/**
+ * 진입 페이지마다 부른다 — 어디로 들어오든 방문 1건이 잡히게.
+ *
+ * `landing_view`와 따로 두는 이유는 그쪽이 "`/`·`/input`에 도달했나"를 세는 값이라
+ * 대본이 이미 저장된 브라우저로 `/quiz`·`/prac`에 바로 들어오면 한 건도 안 남기
+ * 때문이다. 이 앱은 `analytics_storage:'denied'`로 돌아 GA4가 방문을 세지 못하므로
+ * 쿠키 없이 방문을 세는 자리는 여기 하나뿐이다(ops의 서브프로젝트 방문자 칸).
+ *
+ * `trackEvent`의 세션 중복제거를 그대로 타므로 한 방문에 1건이다 — 리디렉트로
+ * 페이지를 두세 개 거쳐도 늘지 않는다.
+ */
+export function trackVisit() {
+  trackEvent("visit");
 }
 
 /**

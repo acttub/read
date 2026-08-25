@@ -15,7 +15,9 @@ import {
   readStartIndex,
   readVoiceId,
 } from "./storage.js";
-import { trackCore, trackEvent, trackMetric, trackTtsPlay } from "./tracking.js";
+import { trackCore, trackEvent, trackMetric, trackTtsPlay, trackVisit } from "./tracking.js";
+
+trackVisit();
 
 const myRole = readMyRole();
 

@@ -6,6 +6,9 @@ import {
   readStartIndex,
   saveStartIndex,
 } from "./storage.js";
+import { trackVisit } from "./tracking.js";
+
+trackVisit();
 
 const script = readScript();
 

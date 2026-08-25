@@ -16,7 +16,9 @@ import {
   saveMode,
   savePracticeSettings,
 } from "./storage.js";
-import { trackEvent, trackMetric } from "./tracking.js";
+import { trackEvent, trackMetric, trackVisit } from "./tracking.js";
+
+trackVisit();
 
 const script = readScript();
 
