@@ -303,3 +303,25 @@ test("location이 없는 환경에서는 방문을 보내지 않고 조용히 �
   assert.doesNotThrow(() => trackVisit());
   assert.equal(called, false);
 });
+
+/* 코어로 나가는 링크가 시트 '유입'(클릭) 탭에 잡히는 유일한 경로가 trackCore다.
+   링크만 놓고 이걸 빠뜨리면 ops의 "어떻게 들어오나"에 read 채널이 아예 안 생긴다 —
+   /quiz 완주 CTA가 정확히 그 상태로 오래 있었다. 링크가 있는 페이지는 반드시 부른다. */
+test("acttub으로 나가는 링크가 있는 페이지는 코어 클릭을 센다", async () => {
+  const pages = ["input", "script", "char", "prac", "quiz"];
+  const withLink = [];
+  for (const page of pages) {
+    const html = await readFile(new URL(`../${page}/index.html`, import.meta.url), "utf8");
+    if (/href="https:\/\/acttub\.com/.test(html)) withLink.push(page);
+  }
+  assert.ok(withLink.length > 0, "코어 링크가 있는 페이지를 하나도 못 찾았다");
+
+  for (const page of withLink) {
+    const source = await readFile(new URL(`../app/${page}.js`, import.meta.url), "utf8");
+    assert.match(
+      source,
+      /trackCore\(\s*"read"/,
+      `${page}.js가 코어 링크를 두고도 trackCore("read", …)를 부르지 않는다`,
+    );
+  }
+});

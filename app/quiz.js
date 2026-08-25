@@ -6,7 +6,7 @@ import {
 } from "./match.js";
 import { parseScript } from "./parse.js";
 import { readMyRole, readScript, readStartIndex } from "./storage.js";
-import { trackMetric, trackVisit, withInboundAdId } from "./tracking.js";
+import { trackCore, trackEvent, trackMetric, trackVisit, withInboundAdId } from "./tracking.js";
 
 trackVisit();
 
@@ -1199,7 +1199,13 @@ function initializeQuiz() {
     renderTurn();
   });
   coreLink.addEventListener("click", () => {
-    trackMetric("quiz_core_click");
+    // trackCore가 시트 '유입'(클릭) 탭에 넣는 유일한 경로다. 이걸 안 부르면 링크가
+    // 있어도 ops의 "어떻게 들어오나"에 read 채널이 영영 안 생긴다 — /prac 링크만
+    // 부르고 있었는데 사람이 실제로 닿는 건 이 완주 화면이다.
+    trackCore("read", coreLink.href);
+    trackEvent("cta_click");   // 세션당 1회. 다른 서브프로젝트와 같은 단위로 비교하려고
+    trackMetric("quiz_core_click");  // 발생 횟수. quiz와 prac을 이벤트 탭에서 가르는 이름
+    if (window.gtag) window.gtag("event", "acttub_cta", { from: "read" });
   });
   document.getElementById("exitButton").addEventListener("click", () => {
     sessionActive = false;
