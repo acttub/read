@@ -11,11 +11,11 @@ import { ReviewList } from "../ReviewList";
 import { Button, Icon, RoleName, StatusPill } from "../ui";
 import type { RunStats } from "./DoneScreen";
 
-export function useStyleFor(script: StoredScript, myRole: string) {
+export function useStyleFor(script: StoredScript, myRole: string, deviceVoices: Readonly<Record<string, string>> = {}) {
   // 내 배역을 뺀 나머지에게 등장 순서대로 목소리를 준다. 같은 대본이면 늘 같은 배정이다.
   const voices = useMemo(
-    () => assignVoices(script.roles.filter((r) => r !== myRole)),
-    [script.roles, myRole],
+    () => assignVoices(script.roles.filter((r) => r !== myRole), deviceVoices),
+    [script.roles, myRole, deviceVoices],
   );
   const fallback = useMemo(() => Object.values(voices)[0], [voices]);
   return (role: string) => voices[role] ?? fallback;
@@ -62,7 +62,7 @@ export function PastLine({ line, myRole }: { line: DialogueLine; myRole: string 
 }
 
 export function RehearsalScreen({ script, setup, onFinish, onExit }: { script: StoredScript; setup: Setup; onFinish: (s: RunStats) => void; onExit: () => void }) {
-  const styleFor = useStyleFor(script, setup.myRole);
+  const styleFor = useStyleFor(script, setup.myRole, setup.deviceVoices);
   const runner = useRehearsalRunner(
     { lines: script.lines, myRole: setup.myRole, start: setup.start, end: setup.end },
     { myTurn: setup.advanceMode, styleFor },

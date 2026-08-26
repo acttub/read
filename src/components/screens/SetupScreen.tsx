@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { micSupported } from "../../lib/audio/mic";
 import { sttAvailable } from "../../lib/audio/stt";
 import { serverRecordingAvailable } from "../../lib/audio/transcribe";
-import { assignVoices, getEngine, speak, ttsSupported, unlockTts, type Engine } from "../../lib/audio/tts";
+import { assignVoices, cancelSpeech, getEngine, getKoreanVoices, speak, ttsSupported, unlockTts, waitForVoices, type Engine } from "../../lib/audio/tts";
 import { VoiceSetup } from "../VoiceSetup";
-import type { AdvanceMode, Mode, QuizInputMode, Setup, StoredScript } from "../../lib/storage";
+import { restoreDeviceVoices, setDeviceVoice, type AdvanceMode, type Mode, type QuizInputMode, type Setup, type StoredScript } from "../../lib/storage";
 import { Page } from "../Page";
 import { ReviewList } from "../ReviewList";
 import { Button, Card, CardTitle, Icon, SelectCard, StepsPill, TopBar } from "../ui";
@@ -34,6 +34,20 @@ export function SetupScreen({
   );
   // 준비가 끝나면 VoiceSetup 이 알려 준다 — 읽어 주는 목소리 표시를 바꾸기 위해서다.
   const [engine, setEngineState] = useState<Engine>(getEngine);
+  const [koreanVoices, setKoreanVoices] = useState<SpeechSynthesisVoice[]>(getKoreanVoices);
+  const [deviceVoices, setDeviceVoices] = useState<Record<string, string>>(() =>
+    restoreDeviceVoices(initialSetup?.deviceVoices, script.roles),
+  );
+
+  useEffect(() => {
+    let alive = true;
+    void waitForVoices().then((voices) => {
+      if (alive) setKoreanVoices(voices);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // 음성 준비·안내는 VoiceSetup 이 맡는다. 여기서는 아예 읽어 줄 수 없는 경우만 알린다.
   const voiceNote = ttsSupported()
@@ -43,14 +57,34 @@ export function SetupScreen({
   const others = script.roles.filter((r) => r !== myRole);
   const dialogue = script.lines.filter((l) => l.type === "dialogue");
   const count = (r: string) => dialogue.filter((l) => l.role === r).length;
+  const assignedVoices = assignVoices(others, deviceVoices);
+  const previewTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   function previewVoice() {
     unlockTts();
-    const voices = assignVoices(others);
     // 배역이 마흔 명 넘는 대본도 있다. 다 들려주면 1분이 넘으므로 앞의 몇만 들려준다.
     others.slice(0, 4).forEach((r, i) => {
-      setTimeout(() => void speak(`${r} 역이에요.`, voices[r]), i * 1400);
+      previewTimers.current.push(setTimeout(() => void speak(`${r} 역이에요.`, assignedVoices[r]), i * 1400));
     });
+  }
+
+  /**
+   * 미리듣기는 최대 4초에 걸쳐 예약된다. 그 사이에 시작해 버리면 예약된 예고가
+   * 리허설 첫 대사를 끊고 대신 말한다 — speak 이 내부에서 진행 중인 발화를 끊기 때문이다.
+   * 화면을 떠날 때 예약을 모두 걷어낸다.
+   */
+  useEffect(
+    () => () => {
+      previewTimers.current.forEach(clearTimeout);
+      previewTimers.current = [];
+      cancelSpeech();
+    },
+    [],
+  );
+
+  function previewRole(role: string) {
+    unlockTts();
+    void speak(`${role} 역이에요.`, assignedVoices[role]);
   }
 
   /**
@@ -117,11 +151,39 @@ export function SetupScreen({
         )}
         {voiceNote && <p className="text-[11.5px] text-ink-4 px-1">{voiceNote}</p>}
         <VoiceSetup onEngineChange={setEngineState} />
+        {engine === "device" && koreanVoices.length > 1 && (
+          <div className="rounded-2xl border border-black/5 bg-white p-4">
+            <p className="text-[13.5px] font-extrabold text-ink">배역별 기기 음성</p>
+            <div className="mt-2 flex flex-col gap-2">
+              {others.map((role) => (
+                <div key={role} className="grid grid-cols-[minmax(72px,auto)_1fr_auto] items-center gap-2">
+                  <label htmlFor={`device-voice-${role}`} className="truncate text-[12.5px] font-bold text-ink-3">
+                    {role}
+                  </label>
+                  <select
+                    id={`device-voice-${role}`}
+                    value={deviceVoices[role] ?? ""}
+                    onChange={(event) => setDeviceVoices((current) => setDeviceVoice(current, role, event.target.value))}
+                    className="min-w-0 h-10 rounded-xl border border-line bg-surface px-2.5 text-[12.5px] text-ink"
+                  >
+                    <option value="">자동 배정</option>
+                    {koreanVoices.map((voice) => (
+                      <option key={voice.voiceURI} value={voice.name}>{voice.name}</option>
+                    ))}
+                  </select>
+                  <button type="button" onClick={() => previewRole(role)} className="h-10 px-2 text-[12px] font-bold text-blue">
+                    미리듣기
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </Card>
   );
 
-  const start = () => onStart({ myRole, start: 0, end: script.lines.length - 1, mode, advanceMode, quizInputMode });
+  const start = () => onStart({ myRole, start: 0, end: script.lines.length - 1, mode, advanceMode, quizInputMode, deviceVoices });
 
   return (
     <Page>

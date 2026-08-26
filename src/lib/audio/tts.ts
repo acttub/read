@@ -36,6 +36,14 @@ export interface VoiceStyle {
    * 모델을 안 받은 상태가 첫 방문자의 기본값이라 그쪽이 곧 제품이다.
    */
   voiceIndex: number;
+  /**
+   * 사용자가 배역에 직접 고른 음성 이름. 고르지 않았으면 없다.
+   *
+   * ⚠️ 이름을 **말할 때** 목록에서 찾는다. 배정 시점에 인덱스로 바꿔 두면 안 된다 —
+   * 크롬은 음성 목록이 비동기로 늦게 차서, 목록이 비어 있는 순간에 배정하면
+   * 고른 것이 조용히 버려지고 그 마운트 동안 복구되지 않는다.
+   */
+  voiceName?: string;
 }
 
 /** 배역 하나에 배정된 목소리. 엔진이 바뀌어도 같은 배역은 같은 목소리로 들려야 한다. */
@@ -66,12 +74,17 @@ const PRESET_ORDER: VoicePreset[] = ["F1", "M1", "F2", "M2", "F3", "M3", "F4", "
  * 배역 목록을 받아 배역마다 목소리를 정한다.
  * 순서만 보고 정하므로, 같은 대본이면 다시 들어와도 같은 목소리가 나온다.
  */
-export function assignVoices(roles: string[]): Record<string, RoleVoice> {
+export function assignVoices(
+  roles: string[],
+  selectedDeviceVoices: Readonly<Record<string, string>> = {},
+): Record<string, RoleVoice> {
   const out: Record<string, RoleVoice> = {};
   const cloudVoiceIds = assignCloudVoiceIds(roles);
   roles.forEach((role, i) => {
+    const automaticDevice = DEVICE_STYLES[i % DEVICE_STYLES.length];
+    const chosen = selectedDeviceVoices[role];
     out[role] = {
-      device: DEVICE_STYLES[i % DEVICE_STYLES.length],
+      device: chosen ? { ...automaticDevice, voiceName: chosen } : automaticDevice,
       preset: PRESET_ORDER[i % PRESET_ORDER.length],
       cloudVoiceId: cloudVoiceIds[role],
     };
@@ -141,14 +154,26 @@ export function waitForVoices(timeoutMs = 1500): Promise<SpeechSynthesisVoice[]>
   });
 }
 
+/**
+ * 이 말투로 어떤 음성을 쓸지 고른다.
+ * 고른 이름이 있으면 그것, 지금 기기에 없으면 자동 배정 순번으로 돌아간다.
+ */
+export function pickDeviceVoice<T extends Pick<VoiceLike, "name">>(voices: T[], style: VoiceStyle): T | undefined {
+  if (!voices.length) return undefined;
+  if (style.voiceName) {
+    const chosen = voices.find((v) => v.name === style.voiceName);
+    if (chosen) return chosen;
+  }
+  return voices[style.voiceIndex % voices.length];
+}
+
 function speakWithDevice(body: string, style: VoiceStyle, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
     const synth = window.speechSynthesis;
     const u = new SpeechSynthesisUtterance(body);
     // 배역마다 다른 음성을 준다. 한국어 음성이 하나뿐인 기기에서는 결국 같은 것으로
     // 돌아오고, 그때는 rate·pitch 가 유일한 구분이 된다.
-    const voices = getKoreanVoices();
-    const voice = voices.length ? voices[style.voiceIndex % voices.length] : undefined;
+    const voice = pickDeviceVoice(getKoreanVoices(), style);
     if (voice) u.voice = voice;
     u.lang = "ko-KR";
     u.rate = style.rate;

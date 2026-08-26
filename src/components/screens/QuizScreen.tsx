@@ -20,7 +20,7 @@ type Judge = { kind: "pass" } | { kind: "retry"; said: string } | null;
 type InputEngine = "server" | "browser" | "silent";
 
 export function QuizScreen({ script, setup, onFinish, onExit }: { script: StoredScript; setup: Setup; onFinish: (s: RunStats) => void; onExit: () => void }) {
-  const styleFor = useStyleFor(script, setup.myRole);
+  const styleFor = useStyleFor(script, setup.myRole, setup.deviceVoices);
   const runner = useRehearsalRunner({ lines: script.lines, myRole: setup.myRole, start: setup.start, end: setup.end }, { myTurn: "wait", styleFor });
   const { state } = runner;
   const w = rehearsalWindow(state);

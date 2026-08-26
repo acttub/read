@@ -22,6 +22,7 @@ export interface Setup {
   mode: Mode;
   advanceMode: AdvanceMode;
   quizInputMode?: QuizInputMode;
+  deviceVoices?: Record<string, string>;
 }
 
 const SCRIPT_KEY = "rehearsal.script";
@@ -51,6 +52,30 @@ export const storage = {
   loadSetup: () => read<Setup>(SETUP_KEY),
   saveSetup: (s: Setup | null) => write(SETUP_KEY, s),
 };
+
+/** 저장된 배역별 기기 음성 중 지금 대본에 해당하는 값만 복원한다. */
+export function restoreDeviceVoices(
+  saved: Setup["deviceVoices"],
+  roles: readonly string[],
+): Record<string, string> {
+  if (!saved) return {};
+  const roleSet = new Set(roles);
+  return Object.fromEntries(
+    Object.entries(saved).filter(([role, voiceName]) => roleSet.has(role) && typeof voiceName === "string" && voiceName.length > 0),
+  );
+}
+
+/** 빈 이름은 자동 배정이므로 저장값에서 뺀다. */
+export function setDeviceVoice(
+  current: Readonly<Record<string, string>>,
+  role: string,
+  voiceName: string,
+): Record<string, string> {
+  const next = { ...current };
+  if (voiceName) next[role] = voiceName;
+  else delete next[role];
+  return next;
+}
 
 /**
  * 주소가 정한 모드를 저장된 설정에 얹는다.
