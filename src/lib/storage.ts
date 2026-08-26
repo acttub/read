@@ -49,3 +49,14 @@ export const storage = {
   loadSetup: () => read<Setup>(SETUP_KEY),
   saveSetup: (s: Setup | null) => write(SETUP_KEY, s),
 };
+
+/**
+ * 주소가 정한 모드를 저장된 설정에 얹는다.
+ *
+ * `/quiz`·`/prac` 은 모드를 말하는 주소라 저장값을 덮는다. `/` 는 아니다 —
+ * 화면 안에서 모드를 바꿔 쓰던 사람이 새로고침할 때마다 튕기면 안 된다.
+ */
+export function applyInitialMode(stored: Setup | null, initialMode?: Mode): Setup | null {
+  if (!stored) return null;
+  return initialMode ? { ...stored, mode: initialMode } : stored;
+}

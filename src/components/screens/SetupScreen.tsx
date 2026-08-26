@@ -13,18 +13,20 @@ import { Button, Card, CardTitle, Icon, SelectCard, StepsPill, TopBar } from "..
 export function SetupScreen({
   script,
   initialSetup,
+  initialMode,
   onStart,
   onBack,
   onReinput,
 }: {
   script: StoredScript;
   initialSetup: Setup | null;
+  initialMode: Mode;
   onStart: (setup: Setup) => void;
   onBack: () => void;
   onReinput: () => void;
 }) {
   const [myRole, setMyRole] = useState(initialSetup?.myRole ?? script.roles[0]);
-  const [mode, setMode] = useState<Mode>(initialSetup?.mode ?? "read");
+  const [mode, setMode] = useState<Mode>(initialSetup?.mode ?? initialMode);
   const [advanceMode, setAdvanceMode] = useState<AdvanceMode>(initialSetup?.advanceMode ?? (micSupported() ? "silence" : "manual"));
   // 준비가 끝나면 VoiceSetup 이 알려 준다 — 읽어 주는 목소리 표시를 바꾸기 위해서다.
   const [engine, setEngineState] = useState<Engine>(getEngine);

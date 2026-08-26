@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useDesktop } from "../hooks/useMediaQuery";
-import { storage, type Setup, type StoredScript } from "../lib/storage";
+import { applyInitialMode, storage, type Mode, type Setup, type StoredScript } from "../lib/storage";
 import { DoneScreen, type RunStats } from "./screens/DoneScreen";
 import { InputScreen } from "./screens/InputScreen";
 import { QuizScreen } from "./screens/QuizScreen";
@@ -18,11 +18,13 @@ function useHydrated() {
 }
 const isClient = typeof window !== "undefined";
 
-export function App() {
+export function App({ initialMode }: { initialMode?: Mode } = {}) {
   const hydrated = useHydrated();
   const desktop = useDesktop();
   const [script, setScript] = useState<StoredScript | null>(() => (isClient ? storage.loadScript() : null));
-  const [setup, setSetup] = useState<Setup | null>(() => (isClient ? storage.loadSetup() : null));
+  const [setup, setSetup] = useState<Setup | null>(() => {
+    return applyInitialMode(isClient ? storage.loadSetup() : null, initialMode);
+  });
   const [phase, setPhase] = useState<Phase>(() => (isClient && storage.loadScript() ? "setup" : "input"));
   const [stats, setStats] = useState<RunStats | null>(null);
 
@@ -58,6 +60,7 @@ export function App() {
       <SetupScreen
         script={script}
         initialSetup={setup}
+        initialMode={initialMode ?? "read"}
         onBack={() => setPhase(desktop ? "input" : "review")}
         onReinput={() => setPhase("input")}
         onStart={(st) => {

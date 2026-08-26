@@ -1,6 +1,7 @@
 "use client";
 
 import type { Setup, StoredScript } from "../../lib/storage";
+import { trackCoreCta, withInboundAdId } from "../../lib/tracking";
 import { Page } from "../Page";
 import { Button, Icon } from "../ui";
 
@@ -33,6 +34,12 @@ export function DoneScreen({
   onNewScript: () => void;
 }) {
   const quiz = stats.mode === "quiz" ? stats.quiz : undefined;
+  const coreHref =
+    stats.mode === "quiz"
+      ? withInboundAdId(
+          "https://acttub.com/?utm_source=read&utm_medium=subproject&utm_campaign=read_quiz",
+        )
+      : "https://acttub.com";
   const items: [string, string][] = [
     [setup.myRole, "내 배역"],
     [`${stats.lineCount}줄`, stats.mode === "quiz" ? "내 대사" : "읽은 대사"],
@@ -75,7 +82,13 @@ export function DoneScreen({
             상대 대사는 기계가 읽었어요. 네 대사에 무슨 생각을 담을지는 네가 정한 거예요.
           </p>
           <p className="text-[12.5px] md:text-[13px] text-muted leading-relaxed">이 장면을 촬영해 올리면 막힌 지점과 다음 시도를 질문으로 찾아요.</p>
-          <a href="https://acttub.com" target="_blank" rel="noreferrer" className="text-[13.5px] font-extrabold text-blue-light mt-1">
+          <a
+            href={coreHref}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => trackCoreCta(coreHref, stats.mode)}
+            className="text-[13.5px] font-extrabold text-blue-light mt-1"
+          >
             acttub에서 질문으로 →
           </a>
         </div>
