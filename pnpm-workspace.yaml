@@ -1,0 +1,5 @@
+allowBuilds:
+  # onnxruntime-web 이 끌고 오는 의존성. 설치 스크립트는 코드 생성용이라 우리 쪽에서 쓸 일이 없다.
+  protobufjs: false
+  sharp: false
+  unrs-resolver: false

@@ -1,8 +1,6 @@
-# 배포 산출물이 아닌 것. 막지 않으면 공개 URL로 그대로 열린다.
-design/
-src/
-.omc/
-node_modules/
-build-fonts.py
+# 배포에 올리지 않는 것.
+# legacy/ 는 정적 사이트 원본이다 — 이관이 끝나면 통째로 지운다. 배포에는 필요 없다.
+legacy/
+docs/
 AGENTS.md
 CLAUDE.md

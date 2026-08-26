@@ -1,0 +1,8 @@
+# 배포 산출물이 아닌 것. 막지 않으면 공개 URL로 그대로 열린다.
+design/
+src/
+.omc/
+node_modules/
+build-fonts.py
+AGENTS.md
+CLAUDE.md

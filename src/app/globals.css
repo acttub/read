@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+/* pen 시안(RN앱 반영.pen) 토큰 — 토스 톤 라이트 */
+:root {
+  --blue: #3182f6;
+  --blue-dark: #1b64da;
+  --blue-soft: #e8f3ff;
+  --blue-mist: #f8fbff;
+  --blue-line: #dce9ff;
+  --ink: #191f28;
+  --ink-strong: #333d4b;
+  --ink-sub: #4e5968;
+  --ink-3: #6b7684;
+  --ink-4: #8b95a1;
+  --ink-5: #b0b8c1;
+  --line: #e5e8eb;
+  --line-soft: #edf0f3;
+  --gray-bg: #f2f4f6;
+  --gray-bg-2: #f9fafb;
+  --surface: #ffffff;
+  --green: #009959;
+  --green-bg: #e5f8ef;
+  --warn: #8a4b00;
+  --warn-bg: #fff8ec;
+  --red: #e42939;
+  --navy: #0f1525;
+  --blue-light: #8fa5ff;
+  --muted: #9fb0c9;
+  --partner: #b45309;
+  --partner-soft: #d9a066;
+  --me-soft: #7fb0f5;
+}
+
+@theme inline {
+  --color-blue: var(--blue);
+  --color-blue-dark: var(--blue-dark);
+  --color-blue-soft: var(--blue-soft);
+  --color-blue-mist: var(--blue-mist);
+  --color-blue-line: var(--blue-line);
+  --color-ink: var(--ink);
+  --color-ink-strong: var(--ink-strong);
+  --color-ink-sub: var(--ink-sub);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-ink-5: var(--ink-5);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-gray-bg: var(--gray-bg);
+  --color-gray-bg-2: var(--gray-bg-2);
+  --color-surface: var(--surface);
+  --color-green: var(--green);
+  --color-green-bg: var(--green-bg);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-red: var(--red);
+  --color-navy: var(--navy);
+  --color-blue-light: var(--blue-light);
+  --color-muted: var(--muted);
+  --color-partner: var(--partner);
+  --color-partner-soft: var(--partner-soft);
+  --color-me-soft: var(--me-soft);
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui,
+    "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+}
+
+html {
+  color-scheme: light;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--gray-bg-2);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  min-height: 100svh;
+  overscroll-behavior-y: none;
+}
+
+/* 사용자 대본 글자는 임의라 시스템 한글 글꼴로 떨어뜨린다 */
+.script-text {
+  font-family: "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", system-ui,
+    sans-serif;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.blur-line {
+  filter: blur(8px);
+  user-select: none;
+  pointer-events: none;
+}
+
+@keyframes speaking-bar {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1); }
+}
+.bar {
+  display: inline-block;
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--blue);
+  transform-origin: bottom;
+  animation: speaking-bar 0.9s ease-in-out infinite;
+}
+.bar:nth-child(2) { animation-delay: 0.15s; }
+.bar:nth-child(3) { animation-delay: 0.3s; }
+.bar:nth-child(4) { animation-delay: 0.45s; }
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(49, 130, 246, 0.45); }
+  100% { box-shadow: 0 0 0 12px rgba(49, 130, 246, 0); }
+}
+.pulse-me { animation: pulse-ring 1.4s ease-out infinite; }
