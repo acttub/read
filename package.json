@@ -1,16 +1,41 @@
 {
-  "name": "read",
-  "version": "0.0.0",
+  "name": "rehearsal-web",
+  "version": "0.1.0",
   "private": true,
-  "type": "module",
-  "description": "read.acttub.com — 대본을 넣으면 내 배역 말고 다른 배역 대사를 읽어주는 연습 도구. 스타일만 Tailwind CLI로 굽고 배포는 정적이다. type:module은 api/의 서버리스 함수가 ESM이라 필요하다 — 없으면 런타임이 .js를 CommonJS로 파싱해 export에서 죽을 수 있다.",
   "scripts": {
-    "css": "tailwindcss -i src/input.css -o styles.css --minify",
-    "css:watch": "tailwindcss -i src/input.css -o styles.css --watch",
-    "test": "node --test"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "copy-ort": "node scripts/copy-ort.mjs",
+    "predev": "node scripts/copy-ort.mjs",
+    "prebuild": "node scripts/copy-ort.mjs"
+  },
+  "dependencies": {
+    "fft.js": "^4.0.4",
+    "hwp.js": "^0.0.3",
+    "mammoth": "^1.12.1",
+    "next": "16.3.2",
+    "onnxruntime-web": "^1.29.0",
+    "pdfjs-dist": "^6.2.108",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "@tailwindcss/cli": "^4.1.11",
-    "tailwindcss": "^4.1.11"
-  }
+    "@tailwindcss/postcss": "^4",
+    "@types/jsdom": "^30.0.0",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.2",
+    "jsdom": "^30.0.1",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^4.1.11"
+  },
+  "packageManager": "pnpm@11.15.0"
 }

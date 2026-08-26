@@ -1,5 +1,50 @@
 # read.acttub.com — 상대역 리딩 (가칭)
 
+> ## ⚠️ 이 브랜치(`feat/next-merge`)는 스택 교체 중이다 — 아래 본문은 아직 `main`(정적 사이트) 기준이다
+>
+> **소유자 결정(2026-08-26):** read.acttub.com 을 `ryujisung/read_tts`(Next 16 · React 19 · Tailwind 4) 기준으로 옮기고,
+> 현행 정적 사이트의 기능을 그 위로 이관한다. 볼트 `AGENTS.md` 의 "기존 서브프로젝트 프레임워크 마이그레이션 금지"에 대한 명시적 예외다.
+>
+> ### 지금 상태
+> - 루트 = read_tts 트리(Next 앱). 정적 사이트 원본은 `legacy/` 에 그대로 있다.
+>   **이관 검증의 유일한 근거이므로 끝나기 전에 지우지 않는다** — `legacy/test/` 만 2,400줄이다.
+> - 이 브랜치는 **측정용**이다. 지금 `main` 에 머지하면 아래 "아직 이관 안 된 것" 이 전부 사라진다.
+>
+> ### 이 브랜치에서 바꾼 것 — 전부 다운로드 용량과 속도 하나 때문이다
+> 1. **실행 장치를 wasm 으로 고정**(`src/lib/audio/supertonic/models.ts` 의 `FORCED_BACKEND`) → 받는 용량 **398MB → 144MB**.
+>    WebGPU 를 쓰면 int8 결과가 깨지는데(onnxruntime 의 알려진 버그) iOS 26 Safari 는 WebGPU 가 기본이라
+>    그대로 두면 **기기가 좋을수록 더 받는** 뒤집힌 구조가 된다.
+> 2. **COEP `credentialless` → `require-corp`**(`next.config.ts`) — **Safari 는 credentialless 를 지원하지 않는다.**
+>    그대로 두면 아이폰에서 격리가 안 서서 스레드가 1개로 떨어지고, 폰 1스레드는 RTF 2.5 라 소리가 끊긴다.
+>    우리가 쓰는 교차 출처 리소스는 전부 CORP/CORS 조건을 만족한다(2026-08-26 헤더 확인).
+> 3. `/mobile-check` 에 **교차 출처 격리·스레드 수** 표시 추가.
+> 4. 받는 용량 상한 회귀 테스트(`src/lib/audio/supertonic/models.test.ts`).
+>
+> ### 다음에 할 일은 실기기 측정 하나다
+> `/mobile-check` 를 **HTTPS 배포본**에서 아이폰 Safari + 인스타 인앱으로 연다.
+> ⚠️ `http://LAN-IP` 로 재면 secure context 가 아니라 SharedArrayBuffer 자체가 없어 **항상 1스레드 숫자**가 나온다.
+> 통과선은 그 화면이 이미 쓰는 **RTF 0.8**. 넘으면 온디바이스 음성은 이 서비스의 기본이 될 수 없다.
+>
+> ### 아직 이관 안 된 것 — `main` 에만 있다. 머지 전 체크리스트
+> | 무엇 | `main` 위치 | 왜 필요한가 |
+> |---|---|---|
+> | AI 배역 판별 | `legacy/api/parse-roles.js` · `legacy/app/ai-roles.js` | 2026-08-24 에 기본 경로로 승격됐다. 휴리스틱만으로는 실사용 대본이 깨졌다 |
+> | 말하기 대조 주 엔진 | `legacy/api/transcribe.js` | read_tts 는 브라우저 STT 만 쓴다 — 아래 본문 규칙상 그건 **폴백**이다 |
+> | 유료 음성 경로 | `legacy/api/tts.js` | 모델을 안 받은 사람에게 남는 유일한 자연스러운 음성 |
+> | 유입 계측 | `legacy/app/tracking.js` | GA4 consent-denied + 시트 `visit`·CTA. 없으면 유입이 아예 안 잡힌다 |
+> | 배역별 음성 선택 | `legacy/app/voices.js` 의 `resolveVoiceForRole` | read_tts 폴백은 **모든 배역을 같은 음성**으로 읽는다 |
+> | 파서 실사용 수정 | `legacy/app/parse.js` · `legacy/test/parse.test.js` | 등장인물 소개 제거 · 조사 처리 · 여러 줄 대사 이어붙이기. read_tts 파서는 상위집합이 **아니다** |
+> | `privacy.html` | `legacy/privacy.html` | 전송 경로가 바뀌면 같이 고친다(본문 규칙). Supertonic 모델 다운로드가 새로 생겼다 |
+> | 진입 URL | `/quiz` `/prac` `/input` `/char` `/script` | 이 브랜치에는 `/` 와 `/mobile-check` 뿐이다 — 인스타·카피가 가리키는 주소가 깨진다 |
+>
+> 이관 통과 기준은 눈이 아니라 **`legacy/test/` 가 새 코드에서 통과하느냐**다.
+> 특히 파서는 두 구현이 서로 다르므로, 옛 테스트를 새 파서에 걸어 보고 판단한다.
+>
+> ### read_tts 에서 넘어온 것 중 `main` 에 없던 것
+> 브라우저 안에서 도는 Supertonic 음성 · hwp·docx 대본 · 한국어 음성 품질 정렬(윈도우에서 늘 최악을 고르던 것 수정) ·
+> 합성 진폭 안전장치 · 리허설 상태머신과 그 테스트 · `/mobile-check`.
+
+
 대본을 붙여넣고 내 배역을 고르면 **다른 배역의 대사를 소리로 읽어주거나**(`/prac`), **내 대사를 가리고 암기를 맞춰보는**(`/quiz`) 혼자 연습용 도구.
 
 > 기획 정본은 볼트의 서브프로젝트 기획 문서다. 여기엔 작업 규칙만 둔다.
