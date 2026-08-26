@@ -1,14 +1,20 @@
 "use client";
 
 /**
- * 자연스러운 음성을 켜는 자리.
+ * 자연스러운 음성을 고르는 자리.
+ *
+ * 순서가 정해져 있다(소유자 결정 2026-08-26):
+ *   기본  — 브라우저 안에서 도는 음성. 단 **이 기기에서 쓸 만할 때만** 권한다(WebGPU 기준).
+ *   부가  — 서버에서 만드는 음성. 받을 것이 없어 바로 쓴다.
+ *   폴백  — 위가 실패하면 기기 내장 음성.
  *
  * 모델은 100MB 를 훌쩍 넘으므로 몰래 받지 않는다 — 용량을 보여 주고 누를 때만 받는다.
- * 받지 않아도 리허설은 기기 내장 음성으로 그대로 돌아간다.
+ * WebGPU 가 없는 기기에는 아예 띄우지 않는다. 받아도 소리가 끊겨서, 받게 해 놓고
+ * 끊기는 것이 안 권하는 것보다 나쁘다(engine.ts 의 isViableHere 주석에 실측이 있다).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { enableSupertonic, getEngine, isRemoteOnly, setEngine, ttsSupported, waitForVoices, type Engine } from "../lib/audio/tts";
-import { downloadSize, hasCachedModels, type LoadProgress } from "../lib/audio/supertonic/engine";
+import { downloadSize, hasCachedModels, isViableHere, type LoadProgress } from "../lib/audio/supertonic/engine";
 import { MODEL_ATTRIBUTION } from "../lib/audio/supertonic/models";
 
 const mb = (n: number) => `${Math.round(n / 1024 / 1024)}MB`;
@@ -23,6 +29,8 @@ export function VoiceSetup({ onEngineChange }: { onEngineChange?: (e: Engine) =>
   });
 
   const [phase, setPhase] = useState<Phase>("확인중");
+  /** 이 기기에서 브라우저 안 음성이 쓸 만한가. null 이면 아직 모른다. */
+  const [viable, setViable] = useState<boolean | null>(null);
   const [selected, setSelected] = useState<Engine>(getEngine);
   const [size, setSize] = useState(0);
   const [progress, setProgress] = useState<LoadProgress | null>(null);
@@ -34,6 +42,14 @@ export function VoiceSetup({ onEngineChange }: { onEngineChange?: (e: Engine) =>
   useEffect(() => {
     let alive = true;
     void (async () => {
+      const usable = await isViableHere();
+      if (!alive) return;
+      setViable(usable);
+      if (!usable) {
+        // 이 기기에서는 권하지 않는다. 서버 음성과 기기 음성만 남는다.
+        setPhase("받을수있음");
+        return;
+      }
       const [cached, bytes] = await Promise.all([hasCachedModels(), downloadSize()]);
       if (!alive) return;
       setSize(bytes);
@@ -126,7 +142,7 @@ export function VoiceSetup({ onEngineChange }: { onEngineChange?: (e: Engine) =>
             />
           </div>
         </>
-      ) : (
+      ) : viable ? (
         <>
           <p className="font-medium text-neutral-900">더 자연스러운 목소리로 들을 수 있어요</p>
           <p className="mt-1 text-neutral-600">
@@ -143,6 +159,12 @@ export function VoiceSetup({ onEngineChange }: { onEngineChange?: (e: Engine) =>
             {phase === "실패" ? "다시 시도" : `음성 받기 (${mb(size)})`}
           </button>
         </>
+      ) : (
+        // 이 기기에서는 받아서 쓰는 음성을 권하지 않는다 — 받아도 소리가 끊긴다.
+        // 왜 안 보이는지 설명하지 않는다. 고를 수 없는 것을 설명해 봐야 소음이다.
+        <p className="text-neutral-700">
+          기기 음성으로 읽어요.{deviceNote ? ` ${deviceNote}` : ""}
+        </p>
       )}
       {selected !== "cloud" && phase !== "받는중" && (
         <div className="mt-3 border-t border-neutral-100 pt-3">
@@ -156,7 +178,7 @@ export function VoiceSetup({ onEngineChange }: { onEngineChange?: (e: Engine) =>
           </button>
         </div>
       )}
-      {selected !== "cloud" && (
+      {selected !== "cloud" && viable && (
         <p className="mt-3 text-[11px] leading-relaxed text-neutral-400">
           음성 모델 {MODEL_ATTRIBUTION.name} · {MODEL_ATTRIBUTION.author} · {MODEL_ATTRIBUTION.license}
         </p>

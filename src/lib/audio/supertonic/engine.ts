@@ -153,17 +153,35 @@ export async function downloadSize(): Promise<number> {
   return variantBytes(await guessVariant());
 }
 
+async function hasWebGpu(): Promise<boolean> {
+  const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
+  if (!gpu) return false;
+  try {
+    return Boolean(await gpu.requestAdapter());
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 이 기기에서 브라우저 안 음성이 **쓸 만한지**. 권할지 말지를 여기서 가른다.
+ *
+ * 기준은 WebGPU 다. 같은 기기에서 잰 값(2026-08-26, 5.1초 대사):
+ *   webgpu → RTF 0.15   ·   wasm → RTF 1.52 (5초 대사를 만드는 데 7.7초, 소리가 끊긴다)
+ * 폰은 이보다 느리다. WebGPU 가 없는 기기(인앱 웹뷰 등)에 138MB 를 받게 해 놓고
+ * 끊기게 두는 것이 제일 나쁜 결과라, 그런 기기에는 **아예 권하지 않는다.**
+ */
+export async function isViableHere(): Promise<boolean> {
+  if (info) return info.backend === "webgpu";
+  if (FORCED_BACKEND) return FORCED_BACKEND === "webgpu";
+  return hasWebGpu();
+}
+
 /** 워커를 깨우지 않고도 어느 가중치를 쓸지 알아야 안내 문구를 그릴 수 있다. */
 async function guessVariant(): Promise<Variant> {
   if (info) return info.variant;
   if (FORCED_BACKEND) return variantForBackend(FORCED_BACKEND);
-  const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
-  if (!gpu) return "int8";
-  try {
-    return (await gpu.requestAdapter()) ? "fp32" : "int8";
-  } catch {
-    return "int8";
-  }
+  return (await hasWebGpu()) ? "fp32" : "int8";
 }
 
 export function currentBackend(): Backend | null {
