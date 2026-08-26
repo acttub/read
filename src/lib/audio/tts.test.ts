@@ -71,6 +71,13 @@ describe("assignVoices", () => {
     }
   });
 
+  it("배역마다 다른 기기 음성을 배정한다", () => {
+    // 모델을 안 받은 사람에게는 이게 곧 제품이다 — 전부 같은 목소리면 배역이 구분되지 않는다.
+    const got = assignVoices(["윤서", "태오", "민재"]);
+    const indexes = Object.values(got).map((x) => x.device.voiceIndex);
+    expect(new Set(indexes).size).toBe(3);
+  });
+
   it("배역이 없으면 빈 것을 준다", () => {
     expect(assignVoices([])).toEqual({});
   });

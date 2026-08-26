@@ -100,10 +100,11 @@ async function doLoad(id: number, prefer?: Backend): Promise<void> {
   );
   const bytes = Object.fromEntries(parts) as Record<ModelKind, Uint8Array>;
 
-  const [cfgs, indexer] = await Promise.all([
-    fetch(CONFIG_URL).then((r) => r.json()),
-    fetch(INDEXER_URL).then((r) => r.json()),
-  ]);
+  // 가중치와 같이 캐시에 넣는다. 맨 fetch 로 두면 가중치를 받아 뒀어도 매 세션 네트워크가
+  // 필요해서 "한 번 받아 두면 그다음부터는 받지 않아요"(VoiceSetup)가 거짓이 된다.
+  const readJson = async (url: string) =>
+    JSON.parse(new TextDecoder().decode(await fetchModel(url, 0)));
+  const [cfgs, indexer] = await Promise.all([readJson(CONFIG_URL), readJson(INDEXER_URL)]);
 
   const sessions = [];
   for (const k of MODEL_KINDS) {

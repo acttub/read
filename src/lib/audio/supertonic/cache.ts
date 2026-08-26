@@ -5,7 +5,9 @@
  * 그래서 직접 받아서 Cache API 에 넣고, 바이트를 런타임에 건네준다.
  */
 
-const CACHE_NAME = "supertonic-3-int8-v1";
+// 두 벌(fp32·int8)이 같이 들어간다 — 키가 URL 이라 섞이지 않는다.
+// 가중치 URL(모델 SHA)을 바꾸면 이 이름도 올려서 옛 바이트가 남지 않게 한다.
+const CACHE_NAME = "supertonic-3-v2";
 
 /** 캐시 API 가 없는 환경(사파리 사생활 보호 모드 등)에서도 그냥 네트워크로 동작해야 한다. */
 async function openCache(): Promise<Cache | null> {

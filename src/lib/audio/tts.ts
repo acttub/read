@@ -18,6 +18,14 @@ export type Engine = "supertonic" | "device";
 export interface VoiceStyle {
   rate: number;
   pitch: number;
+  /**
+   * 쓸 음성의 순번(품질 순 목록 기준). 목록보다 크면 돌려 쓴다.
+   *
+   * 예전에는 배역과 무관하게 늘 0번(가장 좋은 것)만 썼다. 그러면 모델을 안 받은 사람에게는
+   * 모든 배역이 같은 목소리로 들린다 — 피치만 0.9~1.12 로 흔들 뿐이라 구분이 안 된다.
+   * 모델을 안 받은 상태가 첫 방문자의 기본값이라 그쪽이 곧 제품이다.
+   */
+  voiceIndex: number;
 }
 
 /** 배역 하나에 배정된 목소리. 엔진이 바뀌어도 같은 배역은 같은 목소리로 들려야 한다. */
@@ -33,11 +41,11 @@ export interface RoleVoice {
  * 멀어졌다. 이제 배역 구분은 Supertonic 프리셋이 맡으므로 여기서는 좁게 둔다.
  */
 const DEVICE_STYLES: VoiceStyle[] = [
-  { rate: 1.0, pitch: 1.0 },
-  { rate: 0.96, pitch: 1.12 },
-  { rate: 1.04, pitch: 0.9 },
-  { rate: 0.98, pitch: 1.06 },
-  { rate: 1.02, pitch: 0.95 },
+  { rate: 1.0, pitch: 1.0, voiceIndex: 0 },
+  { rate: 0.96, pitch: 1.12, voiceIndex: 1 },
+  { rate: 1.04, pitch: 0.9, voiceIndex: 2 },
+  { rate: 0.98, pitch: 1.06, voiceIndex: 3 },
+  { rate: 1.02, pitch: 0.95, voiceIndex: 4 },
 ];
 
 /** 남녀가 번갈아 나오도록 섞어 둔다 — 등장 순서대로 집으면 대개 대화처럼 들린다. */
@@ -124,7 +132,10 @@ function speakWithDevice(body: string, style: VoiceStyle, signal?: AbortSignal):
   return new Promise((resolve) => {
     const synth = window.speechSynthesis;
     const u = new SpeechSynthesisUtterance(body);
-    const voice = getKoreanVoices()[0];
+    // 배역마다 다른 음성을 준다. 한국어 음성이 하나뿐인 기기에서는 결국 같은 것으로
+    // 돌아오고, 그때는 rate·pitch 가 유일한 구분이 된다.
+    const voices = getKoreanVoices();
+    const voice = voices.length ? voices[style.voiceIndex % voices.length] : undefined;
     if (voice) u.voice = voice;
     u.lang = "ko-KR";
     u.rate = style.rate;

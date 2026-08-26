@@ -10,10 +10,20 @@
  * 두 번째 실행부터는 네트워크를 타지 않는다.
  */
 
-/** 양자화된 가중치 — sherpa-onnx 가 재패키징한 것. tts.json 이 원본과 동일해 런타임 호환된다. */
-const INT8 = "https://huggingface.co/csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/main";
+// ⚠️ `resolve/main` 이 아니라 커밋 SHA 로 고정한다.
+//
+// main 은 움직이는 참조다. 캐시 키가 URL 이라 main 이 움직여도 캐시는 영영 갱신되지 않고,
+// 반대로 그 저장소가 바뀌거나 사라지면 앱이 죽는다. 무결성 검증(해시)도 없다.
+// int8 쪽은 Supertone 이 아니라 제3자 재패키징본이라 특히 그렇다 — 공식 sherpa-onnx 관리자는
+// `csukuangfj` 인데 이건 `csukuangfj2` 이고 다운로드 0·좋아요 1 이다(2026-08-26 확인).
+// 가중치를 올릴 때는 SHA 를 바꾸고 CACHE_NAME 도 같이 올린다.
+
+/** 양자화된 가중치 — sherpa-onnx 재패키징본. tts.json 이 원본과 동일해 런타임 호환된다. */
+const INT8 =
+  "https://huggingface.co/csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4";
 /** 설정·문자 인덱서·보이스 프리셋 — 원본 저장소. 전부 합쳐 400KB 남짓이라 양자화와 무관하다. */
-const BASE = "https://huggingface.co/Supertone/supertonic-3/resolve/main";
+const BASE =
+  "https://huggingface.co/Supertone/supertonic-3/resolve/3cadd1ee6394adea1bd021217a0e650ede09a323";
 
 export type ModelKind = "durationPredictor" | "textEncoder" | "vectorEstimator" | "vocoder";
 

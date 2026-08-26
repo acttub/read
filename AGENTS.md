@@ -56,7 +56,7 @@
 > | 말하기 대조 주 엔진 | `legacy/api/transcribe.js` | read_tts 는 브라우저 STT 만 쓴다 — 아래 본문 규칙상 그건 **폴백**이다 |
 > | 유료 음성 경로 | `legacy/api/tts.js` | 모델을 안 받은 사람에게 남는 유일한 자연스러운 음성 |
 > | 유입 계측 | `legacy/app/tracking.js` | GA4 consent-denied + 시트 `visit`·CTA. 없으면 유입이 아예 안 잡힌다 |
-> | 배역별 음성 선택 | `legacy/app/voices.js` 의 `resolveVoiceForRole` | read_tts 폴백은 **모든 배역을 같은 음성**으로 읽는다 |
+> | 배역별 음성 **선택 UI** | `legacy/app/voices.js` 의 `resolveVoiceForRole` | 배역마다 다른 음성을 자동 배정하는 것까지는 넣었다(2026-08-26). `main` 처럼 **사용자가 고르는** 자리는 아직 없다 |
 > | 파서 실사용 수정 | `legacy/app/parse.js` · `legacy/test/parse.test.js` | 등장인물 소개 제거 · 조사 처리 · 여러 줄 대사 이어붙이기. read_tts 파서는 상위집합이 **아니다** |
 > | `privacy.html` | `legacy/privacy.html` | 전송 경로가 바뀌면 같이 고친다(본문 규칙). Supertonic 모델 다운로드가 새로 생겼다 |
 > | 진입 URL | `/quiz` `/prac` `/input` `/char` `/script` | 이 브랜치에는 `/` 와 `/mobile-check` 뿐이다 — 인스타·카피가 가리키는 주소가 깨진다 |
