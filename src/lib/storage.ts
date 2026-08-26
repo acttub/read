@@ -13,6 +13,7 @@ export interface StoredScript {
 
 export type AdvanceMode = "silence" | "manual";
 export type Mode = "read" | "quiz";
+export type QuizInputMode = "voice" | "silent";
 
 export interface Setup {
   myRole: string;
@@ -20,6 +21,7 @@ export interface Setup {
   end: number;
   mode: Mode;
   advanceMode: AdvanceMode;
+  quizInputMode?: QuizInputMode;
 }
 
 const SCRIPT_KEY = "rehearsal.script";

@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { micSupported } from "../../lib/audio/mic";
 import { sttAvailable } from "../../lib/audio/stt";
+import { serverRecordingAvailable } from "../../lib/audio/transcribe";
 import { assignVoices, getEngine, speak, ttsSupported, unlockTts, type Engine } from "../../lib/audio/tts";
 import { VoiceSetup } from "../VoiceSetup";
-import type { AdvanceMode, Mode, Setup, StoredScript } from "../../lib/storage";
+import type { AdvanceMode, Mode, QuizInputMode, Setup, StoredScript } from "../../lib/storage";
 import { Page } from "../Page";
 import { ReviewList } from "../ReviewList";
 import { Button, Card, CardTitle, Icon, SelectCard, StepsPill, TopBar } from "../ui";
@@ -28,6 +29,9 @@ export function SetupScreen({
   const [myRole, setMyRole] = useState(initialSetup?.myRole ?? script.roles[0]);
   const [mode, setMode] = useState<Mode>(initialSetup?.mode ?? initialMode);
   const [advanceMode, setAdvanceMode] = useState<AdvanceMode>(initialSetup?.advanceMode ?? (micSupported() ? "silence" : "manual"));
+  const [quizInputMode, setQuizInputMode] = useState<QuizInputMode>(
+    initialSetup?.quizInputMode ?? (serverRecordingAvailable() || sttAvailable() ? "voice" : "silent"),
+  );
   // 준비가 끝나면 VoiceSetup 이 알려 준다 — 읽어 주는 목소리 표시를 바꾸기 위해서다.
   const [engine, setEngineState] = useState<Engine>(getEngine);
 
@@ -104,7 +108,11 @@ export function SetupScreen({
           <SettingRow
             icon="mic"
             title="말한 것 알아듣기"
-            value={sttAvailable() ? "브라우저 음성인식 · 말소리가 브라우저 음성 서비스로 가요" : "이 브라우저는 음성인식이 없어서 글자로 입력해요"}
+            value={quizInputMode === "silent"
+              ? "무음 모드 · 마이크 없이 입력과 넘어가기로 진행해요"
+              : "음성 모드 · OpenAI로 변환하고 실패하면 브라우저 음성인식을 써요"}
+            onClick={() => setQuizInputMode(quizInputMode === "voice" ? "silent" : "voice")}
+            action="바꾸기"
           />
         )}
         {voiceNote && <p className="text-[11.5px] text-ink-4 px-1">{voiceNote}</p>}
@@ -113,7 +121,7 @@ export function SetupScreen({
     </Card>
   );
 
-  const start = () => onStart({ myRole, start: 0, end: script.lines.length - 1, mode, advanceMode });
+  const start = () => onStart({ myRole, start: 0, end: script.lines.length - 1, mode, advanceMode, quizInputMode });
 
   return (
     <Page>
@@ -142,6 +150,9 @@ export function SetupScreen({
               연습 시작
             </Button>
           </div>
+        </div>
+        <div className="text-right text-[11.5px] text-ink-4 pb-2">
+          <a href="/privacy" className="underline underline-offset-2 font-bold text-ink-3">대본과 말소리는 어디로 가나요</a>
         </div>
       </div>
       <div className="md:hidden sticky bottom-0 p-4 bg-gray-bg-2/90 backdrop-blur">

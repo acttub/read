@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRehearsalRunner } from "../../hooks/useRehearsalRunner";
 import { startAutoRecognition, sttAvailable, type AutoListening } from "../../lib/audio/stt";
+import { startServerRecording, type ServerListening } from "../../lib/audio/transcribe";
 import { compare } from "../../lib/quiz/match";
 import { progress, window as rehearsalWindow } from "../../lib/rehearsal/machine";
 import type { DialogueLine } from "../../lib/script/parse";
@@ -16,6 +17,7 @@ import { PastLine, RunHeader, useElapsed, useStyleFor } from "./RehearsalScreen"
 const MAX_MISS = 2; // 같은 줄 2회 미달이면 안내 없이 통과 — 특정 화자만 계속 막히는 것을 구조로 막는다
 
 type Judge = { kind: "pass" } | { kind: "retry"; said: string } | null;
+type InputEngine = "server" | "browser" | "silent";
 
 export function QuizScreen({ script, setup, onFinish, onExit }: { script: StoredScript; setup: Setup; onFinish: (s: RunStats) => void; onExit: () => void }) {
   const styleFor = useStyleFor(script, setup.myRole);
@@ -27,12 +29,15 @@ export function QuizScreen({ script, setup, onFinish, onExit }: { script: Stored
   const [revealed, setRevealed] = useState(-1);
   const [said, setSaid] = useState("");
   const [judge, setJudge] = useState<Judge>(null);
-  const [typing, setTyping] = useState(false);
+  const silentMode = setup.quizInputMode === "silent";
+  const [typing, setTyping] = useState(silentMode);
   const [typed, setTyped] = useState("");
   const [listening, setListening] = useState(false);
   const [sttNote, setSttNote] = useState<string | null>(null);
+  const [inputEngine, setInputEngine] = useState<InputEngine>(silentMode ? "silent" : "server");
+  const [listenAttempt, setListenAttempt] = useState(0);
   const missRef = useRef(0);
-  const recRef = useRef<AutoListening | null>(null);
+  const recRef = useRef<AutoListening | ServerListening | null>(null);
   const results = useRef<{ attempted: number; passed: number; pending: number }>({ attempted: 0, passed: 0, pending: 0 });
 
   const myLines = script.lines.filter((l): l is DialogueLine => l.type === "dialogue" && l.role === setup.myRole);
@@ -98,8 +103,7 @@ export function QuizScreen({ script, setup, onFinish, onExit }: { script: Stored
     submitRef.current = submit;
   });
 
-  /** 내 차례가 되면 알아서 듣는다. 말이 끝나면(침묵 1.8초) 그대로 맞춰본다. */
-  const listen = useCallback(() => {
+  const listenInBrowser = useCallback(() => {
     recRef.current = startAutoRecognition({
       onListening: () => setListening(true),
       // 인식되는 대로 보여 준다. 마이크가 살아 있다는 신호이기도 하다.
@@ -119,13 +123,61 @@ export function QuizScreen({ script, setup, onFinish, onExit }: { script: Stored
                 ? "말소리를 못 알아들었어요. 다시 말하거나 입력하기를 써 주세요."
                 : "다시 말해 주세요.",
         );
-        if (reason === "unavailable" || reason === "denied") setTyping(true);
+        if (reason === "unavailable" || reason === "denied") {
+          setInputEngine("silent");
+          setTyping(true);
+        }
       },
     });
   }, []);
 
+  /** 서버 녹음·전사를 먼저 쓰고, 실패한 뒤에만 브라우저 음성인식을 연다. */
+  const listen = useCallback(() => {
+    if (inputEngine === "browser") {
+      listenInBrowser();
+      return;
+    }
+    if (inputEngine === "silent") return;
+    recRef.current = startServerRecording({
+      onListening: () => {
+        setListening(true);
+        setSttNote(null);
+      },
+      onTranscribing: () => {
+        setListening(false);
+        setSttNote("말한 것을 글자로 바꾸는 중이에요.");
+      },
+      onText: (text) => {
+        setListening(false);
+        setSttNote(null);
+        submitRef.current(text);
+      },
+      onFallback: (reason) => {
+        setListening(false);
+        if (reason === "no-speech") {
+          setSttNote("말소리를 못 찾았어요. 다시를 누르거나 입력하기를 써 주세요.");
+          return;
+        }
+        if (reason === "denied") {
+          setSttNote("마이크 권한이 없어 무음 모드로 진행해요.");
+          setInputEngine("silent");
+          setTyping(true);
+          return;
+        }
+        if (sttAvailable()) {
+          setSttNote("서버 음성 변환을 쓸 수 없어 브라우저 음성인식으로 전환했어요. 다시 말해 주세요.");
+          setInputEngine("browser");
+        } else {
+          setSttNote("음성 변환을 쓸 수 없어 무음 모드로 진행해요.");
+          setInputEngine("silent");
+          setTyping(true);
+        }
+      },
+    });
+  }, [inputEngine, listenInBrowser]);
+
   // 내 차례 동안만 마이크를 연다. 판정이 끝나거나 줄이 넘어가면 바로 닫는다.
-  const myTurnNow = isMe && !judge && !typing && sttAvailable();
+  const myTurnNow = isMe && !judge && !typing && inputEngine !== "silent";
   useEffect(() => {
     if (!myTurnNow) return;
     listen();
@@ -133,7 +185,7 @@ export function QuizScreen({ script, setup, onFinish, onExit }: { script: Stored
       recRef.current?.abort();
       recRef.current = null;
     };
-  }, [myTurnNow, lineKey, listen]);
+  }, [myTurnNow, lineKey, listen, listenAttempt]);
 
 
   const stage = (
@@ -198,7 +250,13 @@ export function QuizScreen({ script, setup, onFinish, onExit }: { script: Stored
               <Button type="submit" size="md">확인</Button>
             </form>
           )}
-          <p className="text-[11.5px] text-ink-4">내 차례 동안 마이크가 켜져 있어요. 말한 것을 글자로 바꿔 대본과만 맞춰보고 바로 버려요. {sttAvailable() && "말소리는 브라우저 음성 서비스로 가요."}</p>
+          <p className="text-[11.5px] text-ink-4">
+            {inputEngine === "silent"
+              ? "무음 모드에서는 마이크를 쓰지 않아요. 입력한 글자는 대본과만 맞춰보고 바로 버려요."
+              : inputEngine === "browser"
+                ? "내 차례 동안 마이크가 켜지고 말소리는 브라우저 음성 서비스로 가요. 받은 글자는 대조 뒤 바로 버려요."
+                : "내 차례 동안만 녹음해 OpenAI로 보내 글자로 바꾸고, 대조 뒤 녹음과 글자를 바로 버려요."}
+          </p>
           {sttNote && <p className="text-[12px] text-red">{sttNote}</p>}
         </>
       )}
@@ -207,7 +265,7 @@ export function QuizScreen({ script, setup, onFinish, onExit }: { script: Stored
 
   const controls = idle ? (
     <div className="flex flex-col items-center gap-2.5">
-      <p className="text-[12.5px] text-ink-4">내 차례엔 대사가 가려지고 마이크가 켜져요. 말하면 알아서 맞춰봐요.</p>
+      <p className="text-[12.5px] text-ink-4">{silentMode ? "내 차례엔 대사가 가려져요. 입력하거나 넘어가기로 끝까지 진행할 수 있어요." : "내 차례엔 대사가 가려지고 마이크가 켜져요. 말하면 알아서 맞춰봐요."}</p>
       <Button size="lg" className="w-full md:w-[340px]" disabled={runner.preparing} onClick={() => { markStart(); void runner.start(); }}>
         {runner.preparing ? "상대 목소리 준비 중…" : "시작"}
       </Button>
@@ -215,7 +273,7 @@ export function QuizScreen({ script, setup, onFinish, onExit }: { script: Stored
   ) : isMe ? (
     <div className="flex flex-col items-center gap-2.5">
       <div className="flex items-center justify-center gap-3 w-full">
-        <Button variant="secondary" className="flex-1 md:w-36 md:flex-none" onClick={() => { setSaid(""); setJudge(null); setSttNote(null); }}>
+        <Button variant="secondary" className="flex-1 md:w-36 md:flex-none" onClick={() => { setSaid(""); setJudge(null); setSttNote(null); setListenAttempt((value) => value + 1); }}>
           다시
         </Button>
         <button

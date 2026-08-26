@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ACCEPTED, extractText, OldHwpError, UnsupportedFileError } from "../../lib/script/extract";
+import { createAiRoleLookup, DIRECT_INPUT_LOOKUP_DELAY_MS } from "../../lib/script/ai-roles";
 import { countLinesByRole, parseScript } from "../../lib/script/parse";
 import { SAMPLE_SCRIPT } from "../../lib/script/sample";
 import type { StoredScript } from "../../lib/storage";
@@ -16,19 +17,23 @@ export function InputScreen({ initialRaw, onParsed }: { initialRaw: string; onPa
   const [hint, setHint] = useState("");
   const [busy, setBusy] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [aiResult, setAiResult] = useState<{ raw: string; roles: string[] | null }>({ raw: "", roles: null });
   const fileRef = useRef<HTMLInputElement>(null);
+  const [aiLookup] = useState(createAiRoleLookup);
 
   // 배역에서 뺀 이름. 형식이 제각각이라 자동 판별이 늘 맞지는 않는다.
   const [excluded, setExcluded] = useState<string[]>([]);
 
   const hints = useMemo(() => hint.split(/[,，\n]/).map((s) => s.trim()).filter(Boolean), [hint]);
+  const aiRoles = aiResult.raw === raw ? aiResult.roles : null;
+  const roleHints = useMemo(() => [...new Set([...(aiRoles ?? []), ...hints])], [aiRoles, hints]);
   const parsed = useMemo(
-    () => parseScript(raw, { roleHints: hints, excludeRoles: excluded }),
-    [raw, hints, excluded],
+    () => parseScript(raw, { roleHints, excludeRoles: excluded }),
+    [raw, roleHints, excluded],
   );
   // 뺀 이름을 되살리려면 원래 후보를 알아야 한다.
-  const allRoles = useMemo(() => parseScript(raw, { roleHints: hints }).roles, [raw, hints]);
-  const counts = useMemo(() => countLinesByRole(parseScript(raw, { roleHints: hints }).lines), [raw, hints]);
+  const allRoles = useMemo(() => parseScript(raw, { roleHints }).roles, [raw, roleHints]);
+  const counts = useMemo(() => countLinesByRole(parseScript(raw, { roleHints }).lines), [raw, roleHints]);
   const ranked = useMemo(
     () => [...allRoles].sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0)),
     [allRoles, counts],
@@ -40,6 +45,21 @@ export function InputScreen({ initialRaw, onParsed }: { initialRaw: string; onPa
   const directionCount = parsed.lines.length - dialogueCount;
   const hasText = raw.trim().length > 0;
   const ready = parsed.roles.length >= 2 && dialogueCount >= 2;
+
+  useEffect(() => {
+    if (!raw.trim()) return;
+    const text = raw;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void aiLookup(text).then((roles) => {
+        if (!cancelled) setAiResult({ raw: text, roles });
+      });
+    }, DIRECT_INPUT_LOOKUP_DELAY_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [aiLookup, raw]);
 
   async function onPickFile(file: File | undefined) {
     if (!file) return;
@@ -178,7 +198,7 @@ export function InputScreen({ initialRaw, onParsed }: { initialRaw: string; onPa
                   className="script-text w-full min-h-[200px] rounded-[14px] bg-surface border border-line p-3.5 text-[14px] leading-relaxed placeholder:text-ink-5 focus:outline-none focus:border-blue resize-y"
                 />
               )}
-              <p className="text-[11.5px] text-ink-4 leading-relaxed">배역 찾기는 이 기기 안에서 해요. 대본은 서버로 보내지 않아요.</p>
+              <p className="text-[11.5px] text-ink-4 leading-relaxed">배역을 찾을 때 대본 앞 100,000자가 OpenAI로 전달돼요. 배역 이름만 받고 대본은 서버에 저장하지 않아요.</p>
             </div>
           </Card>
           {rolesCard}
@@ -186,7 +206,7 @@ export function InputScreen({ initialRaw, onParsed }: { initialRaw: string; onPa
 
         <div className="flex items-center justify-between text-[11.5px] text-ink-4 pb-6">
           <span>대본은 이 기기에만 저장돼요.</span>
-          <span className="underline underline-offset-2 font-bold text-ink-3">대본은 어디로 가나요</span>
+          <a href="/privacy" className="underline underline-offset-2 font-bold text-ink-3">대본은 어디로 가나요</a>
         </div>
       </div>
     </Page>
