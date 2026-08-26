@@ -7,10 +7,14 @@
  * 데스크톱보다 한참 느리다. 짐작하지 말고 숫자를 보고 판단하려고 만들었다.
  */
 import { useCallback, useState } from "react";
-import { load, synthesize, currentBackend, currentVariant, downloadSize, hasCachedModels, type LoadProgress } from "../../lib/audio/supertonic/engine";
+import { load, synthesize, currentBackend, currentVariant, type LoadProgress } from "../../lib/audio/supertonic/engine";
+import { isCached } from "../../lib/audio/supertonic/cache";
+import { FORCED_BACKEND, MODEL_VARIANTS, variantBytes, variantForBackend, type BackendName } from "../../lib/audio/supertonic/models";
 import { playSynthesized, unlockAudio } from "../../lib/audio/supertonic/play";
 
 const LINE = "달라지지. 나는 알잖아, 네가 그거 얼마나 준비했는지.";
+/** 되돌리기 단계. 줄이면 계산이 준다 — 어디까지 줄여야 쓸 만해지는지 한 번에 본다. */
+const STEP_TRIALS = [8, 6, 4];
 const mb = (n: number) => `${Math.round(n / 1024 / 1024)}MB`;
 
 interface Row {
@@ -54,34 +58,44 @@ export default function MobileCheck() {
       add({ label: "wasm 스레드", value: `${threads}개 (코어 ${cores})`, good: threads > 1 });
       if (nav.deviceMemory) add({ label: "기기 메모리", value: `약 ${nav.deviceMemory}GB` });
 
-      const size = await downloadSize();
-      const cached = await hasCachedModels();
+      // ?backend=webgpu / ?backend=wasm 으로 강제할 수 있다. 없으면 앱이 쓰는 그대로.
+      // 두 길이 맞바꾸는 것이 다르므로(용량 vs 속도) 같은 기기에서 둘 다 재 보라고 열어 뒀다.
+      const asked = new URLSearchParams(window.location.search).get("backend");
+      const prefer: BackendName | undefined = asked === "webgpu" || asked === "wasm" ? asked : undefined;
+      const variant = variantForBackend(prefer ?? FORCED_BACKEND ?? (hasGpu ? "webgpu" : "wasm"));
+      const size = variantBytes(variant);
+      const cached = await isCached(Object.values(MODEL_VARIANTS[variant].urls));
       add({ label: "받아야 할 용량", value: `${mb(size)}${cached ? " (이미 받아 둠)" : ""}` });
 
       const t0 = performance.now();
-      await load(setProgress);
+      await load(setProgress, prefer);
       const loadSec = (performance.now() - t0) / 1000;
       add({ label: "준비 시간", value: `${loadSec.toFixed(1)}초`, good: loadSec < 30 });
       add({ label: "쓰는 방식", value: `${currentBackend()} + ${currentVariant()}` });
 
-      // 처음 한 번은 밑준비가 섞이므로 두 번째를 잰다.
-      await synthesize(LINE, "F1", { gapSec: 0.1 });
-      const t1 = performance.now();
-      const audio = await synthesize(LINE, "M1", { gapSec: 0.1 });
-      const gen = (performance.now() - t1) / 1000;
-      const rtf = gen / audio.duration;
-      add({
-        label: "만드는 속도",
-        value: `${audio.duration.toFixed(1)}초 대사에 ${gen.toFixed(1)}초 (RTF ${rtf.toFixed(2)})`,
-        good: rtf < 0.7,
-      });
+      // 처음 한 번은 밑준비가 섞이므로 버린다.
+      let last = await synthesize(LINE, "F1", { gapSec: 0.1 });
+      let best = Infinity;
+      for (const steps of STEP_TRIALS) {
+        const t1 = performance.now();
+        const audio = await synthesize(LINE, "M1", { gapSec: 0.1, steps });
+        const gen = (performance.now() - t1) / 1000;
+        const rtf = gen / audio.duration;
+        best = Math.min(best, rtf);
+        last = audio;
+        add({
+          label: `만드는 속도 (단계 ${steps})`,
+          value: `${audio.duration.toFixed(1)}초 대사에 ${gen.toFixed(1)}초 — RTF ${rtf.toFixed(2)}`,
+          good: rtf < 0.8,
+        });
+      }
       add({
         label: "쓸 만한가",
-        value: rtf < 0.5 ? "넉넉하다" : rtf < 0.8 ? "쓸 만하다" : rtf < 1.2 ? "빠듯하다" : "느려서 기다림이 생긴다",
-        good: rtf < 0.8,
+        value: best < 0.5 ? "넉넉하다" : best < 0.8 ? "쓸 만하다" : best < 1.2 ? "빠듯하다" : "느려서 기다림이 생긴다",
+        good: best < 0.8,
       });
 
-      await playSynthesized(audio);
+      await playSynthesized(last);
       setDone(true);
     } catch (e) {
       add({ label: "실패", value: e instanceof Error ? e.message : String(e), good: false });
