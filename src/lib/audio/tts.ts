@@ -1,18 +1,28 @@
 /**
- * 상대 대사를 소리로 내보내는 곳. 두 가지 엔진이 있다.
+ * 상대 대사를 소리로 내보내는 곳. 세 가지 엔진이 있다.
  *
- *  supertonic — 브라우저 안에서 도는 신경망 음성. 기본이고, 훨씬 자연스럽다.
- *  device     — 기기 내장 speechSynthesis. 모델을 받기 전이거나 받을 수 없을 때 쓴다.
+ *  device     — 기기 내장 speechSynthesis. 기본값이다.
+ *  supertonic — 브라우저 안에서 도는 신경망 음성. 사용자가 모델을 받은 뒤에 쓴다.
+ *  cloud      — 시작 전에 서버에서 미리 만든 유료 음성. 준비에 실패한 줄은 device로 읽는다.
  *
- * 둘 다 대본을 밖으로 보내지 않는다 — 단, 기기에 원격 음성밖에 없으면
+ * device·supertonic은 대본을 우리 서버로 보내지 않는다 — 단, 기기에 원격 음성밖에 없으면
  * speechSynthesis 는 텍스트를 브라우저 음성 서비스로 넘긴다. `isRemoteOnly()` 로 알린다.
  */
 import { speakableText } from "../script/parse";
+import {
+  assignCloudVoiceIds,
+  clearCloudAudio,
+  playCloudAudio,
+  prepareCloudAudio as preparePaidAudio,
+  preparedCloudAudio,
+  unlockCloudAudio,
+  type CloudLine,
+} from "./cloud";
 import { synthesize, load as loadSupertonic } from "./supertonic/engine";
 import { playSynthesized, unlockAudio } from "./supertonic/play";
 import { VOICE_PRESETS, type VoicePreset } from "./supertonic/models";
 
-export type Engine = "supertonic" | "device";
+export type Engine = "supertonic" | "device" | "cloud";
 
 /** 기기 내장 음성의 말투. 엔진이 포먼트를 보정하지 못하므로 크게 흔들지 않는다. */
 export interface VoiceStyle {
@@ -32,6 +42,7 @@ export interface VoiceStyle {
 export interface RoleVoice {
   device: VoiceStyle;
   preset: VoicePreset;
+  cloudVoiceId: string;
 }
 
 /**
@@ -57,10 +68,12 @@ const PRESET_ORDER: VoicePreset[] = ["F1", "M1", "F2", "M2", "F3", "M3", "F4", "
  */
 export function assignVoices(roles: string[]): Record<string, RoleVoice> {
   const out: Record<string, RoleVoice> = {};
+  const cloudVoiceIds = assignCloudVoiceIds(roles);
   roles.forEach((role, i) => {
     out[role] = {
       device: DEVICE_STYLES[i % DEVICE_STYLES.length],
       preset: PRESET_ORDER[i % PRESET_ORDER.length],
+      cloudVoiceId: cloudVoiceIds[role],
     };
   });
   return out;
@@ -182,6 +195,7 @@ export function getEngine(): Engine {
 export function setEngine(next: Engine): void {
   if (next === engine) return;
   cancelSpeech();
+  if (engine === "cloud") clearCloudAudio();
   engine = next;
 }
 
@@ -198,6 +212,7 @@ export async function enableSupertonic(onProgress?: Parameters<typeof loadSupert
 /** iOS 는 사용자 제스처 안에서 한 번 소리를 내야 그 뒤 자동 재생이 된다. 버튼 핸들러에서 부른다. */
 export function unlockTts(): void {
   unlockAudio();
+  unlockCloudAudio();
   if (!ttsSupported()) return;
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(" ");
@@ -215,9 +230,20 @@ export function cancelSpeech(): void {
  * 한 대사를 읽고 끝나면 resolve. signal 이 abort 되면 즉시 멈추고 조용히 resolve 한다.
  * Supertonic 이 실패하면 그 자리에서 기기 음성으로 읽는다 — 리허설이 멈추면 안 된다.
  */
-export async function speak(text: string, voice: RoleVoice, signal?: AbortSignal): Promise<void> {
+export async function speak(text: string, voice: RoleVoice, signal?: AbortSignal, cloudLineId?: number): Promise<void> {
   const body = speakableText(text);
   if (!body) return;
+
+  if (engine === "cloud" && cloudLineId !== undefined) {
+    const source = preparedCloudAudio(cloudLineId);
+    if (source) {
+      const ac = new AbortController();
+      playing = ac;
+      signal?.addEventListener("abort", () => ac.abort());
+      const played = await playCloudAudio(source, ac.signal);
+      if (played || signal?.aborted) return;
+    }
+  }
 
   if (engine === "supertonic") {
     try {
@@ -245,6 +271,23 @@ export async function prefetch(text: string, voice: RoleVoice): Promise<void> {
   await synthesize(body, voice.preset).catch(() => {
     // 미리 만들어 두는 것뿐이라 실패해도 그냥 넘어간다.
   });
+}
+
+export interface CloudPreparationItem {
+  lineId: number;
+  text: string;
+  voice: RoleVoice;
+}
+
+/** 시작 전에 상대 대사를 전부 유료 음성으로 만든다. cloud가 아니면 아무 일도 하지 않는다. */
+export async function prepareCloudAudio(items: CloudPreparationItem[]): Promise<void> {
+  if (engine !== "cloud") return;
+  const lines: CloudLine[] = items.map(({ lineId, text, voice }) => ({ lineId, text, voiceId: voice.cloudVoiceId }));
+  await preparePaidAudio(lines);
+}
+
+export function clearPreparedCloudAudio(): void {
+  clearCloudAudio();
 }
 
 // ─── 앞으로 나올 대사를 순서대로 미리 만들어 두는 큐 ───────────────────────

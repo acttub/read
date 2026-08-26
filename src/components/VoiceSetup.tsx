@@ -7,7 +7,7 @@
  * 받지 않아도 리허설은 기기 내장 음성으로 그대로 돌아간다.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { enableSupertonic, getEngine, isRemoteOnly, ttsSupported, waitForVoices, type Engine } from "../lib/audio/tts";
+import { enableSupertonic, getEngine, isRemoteOnly, setEngine, ttsSupported, waitForVoices, type Engine } from "../lib/audio/tts";
 import { downloadSize, hasCachedModels, type LoadProgress } from "../lib/audio/supertonic/engine";
 import { MODEL_ATTRIBUTION } from "../lib/audio/supertonic/models";
 
@@ -23,6 +23,7 @@ export function VoiceSetup({ onEngineChange }: { onEngineChange?: (e: Engine) =>
   });
 
   const [phase, setPhase] = useState<Phase>("확인중");
+  const [selected, setSelected] = useState<Engine>(getEngine);
   const [size, setSize] = useState(0);
   const [progress, setProgress] = useState<LoadProgress | null>(null);
   // 지원 여부는 그리기 전에 알 수 있다. effect 안에서 setState 하지 않는다.
@@ -41,7 +42,7 @@ export function VoiceSetup({ onEngineChange }: { onEngineChange?: (e: Engine) =>
         setPhase("받는중");
         try {
           await enableSupertonic(setProgress);
-          if (alive) { setPhase("켜짐"); notify.current?.("supertonic"); }
+          if (alive) { setPhase("켜짐"); setSelected("supertonic"); notify.current?.("supertonic"); }
         } catch {
           if (alive) setPhase("실패");
         }
@@ -74,17 +75,42 @@ export function VoiceSetup({ onEngineChange }: { onEngineChange?: (e: Engine) =>
     try {
       await enableSupertonic(setProgress);
       setPhase("켜짐");
+      setSelected("supertonic");
       notify.current?.("supertonic");
     } catch {
       setPhase("실패");
     }
   }, []);
 
+  const chooseCloud = useCallback(() => {
+    setEngine("cloud");
+    setSelected("cloud");
+    notify.current?.("cloud");
+  }, []);
+
+  const chooseLocal = useCallback(() => {
+    const next: Engine = phase === "켜짐" ? "supertonic" : "device";
+    setEngine(next);
+    setSelected(next);
+    notify.current?.(next);
+  }, [phase]);
+
   if (phase === "확인중") return null;
 
   return (
     <div className="rounded-2xl border border-black/5 bg-white p-4 text-sm">
-      {phase === "켜짐" ? (
+      {selected === "cloud" ? (
+        <>
+          <p className="font-medium text-neutral-900">자연스러운 음성으로 읽어요</p>
+          <p className="mt-1 text-neutral-600">
+            시작 전에 상대 배역 대사만 acttub 서버를 거쳐 음성 서비스로 보내 미리 준비해요.
+            준비하지 못한 줄은 기기 음성으로 읽어요.
+          </p>
+          <button onClick={chooseLocal} className="mt-3 rounded-xl bg-neutral-100 px-4 py-2 text-neutral-800">
+            {phase === "켜짐" ? "기기 안 음성 쓰기" : "기기 음성 쓰기"}
+          </button>
+        </>
+      ) : phase === "켜짐" ? (
         <p className="text-neutral-700">
           자연스러운 음성으로 읽어요. 대사는 기기 밖으로 나가지 않아요.
         </p>
@@ -118,9 +144,23 @@ export function VoiceSetup({ onEngineChange }: { onEngineChange?: (e: Engine) =>
           </button>
         </>
       )}
-      <p className="mt-3 text-[11px] leading-relaxed text-neutral-400">
-        음성 모델 {MODEL_ATTRIBUTION.name} · {MODEL_ATTRIBUTION.author} · {MODEL_ATTRIBUTION.license}
-      </p>
+      {selected !== "cloud" && phase !== "받는중" && (
+        <div className="mt-3 border-t border-neutral-100 pt-3">
+          <p className="font-medium text-neutral-900">받지 않고 바로 쓰기</p>
+          <p className="mt-1 text-neutral-600">
+            상대 배역 대사를 시작 전에 미리 준비해서 리허설 중에 끊기지 않아요.
+            대신 그 대사가 acttub 서버를 거쳐 음성 서비스로 전송돼요.
+          </p>
+          <button onClick={chooseCloud} className="mt-3 rounded-xl bg-neutral-100 px-4 py-2 text-neutral-800">
+            바로 쓰는 음성 켜기
+          </button>
+        </div>
+      )}
+      {selected !== "cloud" && (
+        <p className="mt-3 text-[11px] leading-relaxed text-neutral-400">
+          음성 모델 {MODEL_ATTRIBUTION.name} · {MODEL_ATTRIBUTION.author} · {MODEL_ATTRIBUTION.license}
+        </p>
+      )}
     </div>
   );
 }

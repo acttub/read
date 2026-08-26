@@ -92,9 +92,9 @@ export function SetupScreen({
         <SettingRow
           icon="volume"
           title="읽어주는 목소리"
-          value={`${engine === "supertonic" ? "자연스러운 음성" : "기기 음성"} · ${voiceSummary(others)}`}
-          onClick={previewVoice}
-          action="들어보기"
+          value={`${engine === "cloud" ? "유료 음성" : engine === "supertonic" ? "자연스러운 음성" : "기기 음성"} · ${voiceSummary(others)}`}
+          onClick={engine === "cloud" ? undefined : previewVoice}
+          action={engine === "cloud" ? undefined : "들어보기"}
         />
         {mode === "read" ? (
           <SettingRow

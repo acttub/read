@@ -7,6 +7,7 @@ import { Page } from "../../components/Page";
  * ⚠️ 이 페이지의 본문이 곧 "무엇이 어디로 나가는가"다. 전송 경로나 저장 위치를 바꾸면
  * 여기를 같이 고친다 — 코드와 어긋나는 순간 거짓 고지가 된다.
  * 지금 적혀 있는 경로: /api/parse-roles(OpenAI, 국외) · /api/transcribe(OpenAI, 국외) ·
+ * /api/tts(ElevenLabs, 국외) ·
  * speechSynthesis(기기 안 또는 브라우저 음성 서비스) · SpeechRecognition(브라우저 제공사) ·
  * HuggingFace CDN(음성 모델 내려받기) · 집계 시트.
  */
@@ -98,6 +99,15 @@ export default function PrivacyPage() {
               <A href="https://huggingface.co">HuggingFace</A>의 배포 서버에서 받습니다. 이때 나가는 것은
               파일 요청이지 대사가 아닙니다. 받은 모델은 <B>브라우저 저장 공간에 남습니다</B> — 다음에 또
               받지 않기 위해서이고, 브라우저에서 이 사이트의 저장 데이터를 지우면 함께 지워집니다.
+            </li>
+            <li>
+              <B>바로 쓰는 음성 (서버에서 만드는 음성)</B> — 눌러서 켠 경우에만 씁니다. 연습을 시작하기
+              전에 <B>상대 배역의 대사</B>가 acttub 서버를 거쳐 <B>ElevenLabs</B>의 음성 합성으로
+              전송됩니다. ElevenLabs의 서버는 <B>대한민국 밖에 있습니다</B> — 즉 이 음성을 쓰면 대사가
+              국외로 이전됩니다. 거쳐 가는 acttub 서버는 대사를 저장하지 않고 기록에도 남기지 않습니다 —
+              줄 번호와 응답 상태까지만 남습니다. 만들어진 소리는 <B>연습이 끝나면 지웁니다.</B> 전송된
+              문장을 ElevenLabs가 어떻게 다루는지는{" "}
+              <A href="https://elevenlabs.io/privacy">ElevenLabs 개인정보 처리방침</A>을 따릅니다.
             </li>
           </ul>
           <p className="mt-3">

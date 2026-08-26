@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { startListening, type MicListener } from "../lib/audio/mic";
-import { cancelSpeech, clearPrefetch, prefetch, queuePrefetch, setPrefetchPaused, speak, unlockTts, type RoleVoice } from "../lib/audio/tts";
+import { cancelSpeech, clearPrefetch, clearPreparedCloudAudio, prefetch, prepareCloudAudio, queuePrefetch, setPrefetchPaused, speak, unlockTts, type RoleVoice } from "../lib/audio/tts";
 import { DEFAULT_VAD } from "../lib/audio/vad";
 import {
   advance,
@@ -87,7 +87,10 @@ export function useRehearsalRunner(cfg: RehearsalConfig, opts: RunnerOptions) {
     setPrefetchPaused(state.status === "ai");
   }, [state]);
 
-  useEffect(() => () => clearPrefetch(), []);
+  useEffect(() => () => {
+    clearPrefetch();
+    clearPreparedCloudAudio();
+  }, []);
 
   useEffect(() => {
     cleanup();
@@ -98,7 +101,7 @@ export function useRehearsalRunner(cfg: RehearsalConfig, opts: RunnerOptions) {
       (async () => {
         await delay(GAP_BEFORE_AI_MS, ac.signal);
         if (ac.signal.aborted) return;
-        await speak(line.text, styleForRef.current(line.role), ac.signal);
+        await speak(line.text, styleForRef.current(line.role), ac.signal, state.index);
         if (ac.signal.aborted) return;
         setState((s) => (s.status === "ai" ? advance(s) : s));
       })();
@@ -150,16 +153,20 @@ export function useRehearsalRunner(cfg: RehearsalConfig, opts: RunnerOptions) {
         setMyTurn("manual");
       }
     }
-    // 첫 상대 대사 몇 줄은 만들어 두고 시작한다. 느린 기기에서 첫 줄부터 끊기지 않게.
+    // 유료 음성은 모든 상대 대사를 여기서 먼저 만든다. 내 배역과 지문은 이 목록에 들어오지 않는다.
     setPreparing(true);
     try {
       const s = stateRef.current;
-      const firstLines = s.lines
+      const opponentLines = s.lines
         .slice(s.index, s.end + 1)
-        .filter((l): l is DialogueLine => l.type === "dialogue" && l.role !== s.myRole)
-        .slice(0, WARMUP_LINES);
+        .map((line, offset) => ({ line, lineId: s.index + offset }))
+        .filter((item): item is { line: DialogueLine; lineId: number } => item.line.type === "dialogue" && item.line.role !== s.myRole);
+      await prepareCloudAudio(opponentLines.map(({ line, lineId }) => ({ lineId, text: line.text, voice: styleForRef.current(line.role) })));
+
+      // Supertonic은 첫 상대 대사 몇 줄만 만들어 두고 시작한다. 느린 기기에서 첫 줄부터 끊기지 않게.
+      const firstLines = opponentLines.slice(0, WARMUP_LINES);
       const warm = (async () => {
-        for (const l of firstLines) await prefetch(l.text, styleForRef.current(l.role));
+        for (const { line } of firstLines) await prefetch(line.text, styleForRef.current(line.role));
       })();
       await Promise.race([warm, new Promise<void>((r) => setTimeout(r, WARMUP_TIMEOUT_MS))]);
     } finally {
@@ -178,6 +185,7 @@ export function useRehearsalRunner(cfg: RehearsalConfig, opts: RunnerOptions) {
 
   const stop = useCallback(() => {
     cleanup();
+    clearPreparedCloudAudio();
   }, [cleanup]);
 
   return { state, level, micError, myTurn, preparing, start, togglePause, next, stop };
